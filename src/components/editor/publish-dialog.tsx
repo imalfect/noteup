@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Lock, Shield, Check, Copy, ExternalLink, X, Key, AlertTriangle, Download } from "lucide-react";
 import { toast } from "sonner";
-import { jsPDF } from "jspdf";
+import { pdf, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 
 type PublishResult = {
   url: string;
@@ -115,88 +115,67 @@ export function PublishDialog({
     toast(`${label} copied`);
   };
 
-  const downloadEditKeyPdf = () => {
+  const downloadEditKeyPdf = async () => {
     if (!result) return;
-    const pdf = new jsPDF({ unit: "mm", format: "a4" });
-    const w = 210;
-
-    pdf.setFont("courier", "bold");
-    pdf.setFontSize(20);
-    pdf.setTextColor(23, 23, 23);
-    pdf.text("> noteup", w / 2, 40, { align: "center" });
-
-    pdf.setFont("courier", "normal");
-    pdf.setFontSize(11);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text("edit key — keep this document safe", w / 2, 52, {
-      align: "center",
+    const ks = StyleSheet.create({
+      page: { padding: 60, fontFamily: "Courier", backgroundColor: "#fff" },
+      title: { fontSize: 20, fontWeight: 700, textAlign: "center", color: "#171717" },
+      subtitle: { fontSize: 11, textAlign: "center", color: "#646464", marginTop: 10, marginBottom: 30 },
+      box: { border: "1 solid #ccc", padding: 20 },
+      row: { flexDirection: "row", marginBottom: 10 },
+      label: { width: 80, fontSize: 9, color: "#828282" },
+      value: { flex: 1, fontSize: 9, color: "#171717" },
+      keyValue: { flex: 1, fontSize: 9, color: "#171717", fontWeight: 700 },
+      warning: { fontSize: 8, textAlign: "center", color: "#b4b4b4", marginTop: 30 },
     });
-
-    // border box
-    const bx = 25;
-    const bw = w - 50;
-    pdf.setDrawColor(200);
-    pdf.setLineWidth(0.3);
-    pdf.rect(bx, 65, bw, 80);
-
-    // fields
-    pdf.setFont("courier", "normal");
-    pdf.setFontSize(9);
-    pdf.setTextColor(130);
-
-    let y = 78;
-    const lx = 32;
-    const vx = 75;
-
-    pdf.text("slug", lx, y);
-    pdf.setTextColor(23);
-    pdf.text(slug, vx, y);
-
-    y += 12;
-    pdf.setTextColor(130);
-    pdf.text("url", lx, y);
-    pdf.setTextColor(23);
-    pdf.text(result.url, vx, y);
-
-    y += 12;
-    pdf.setTextColor(130);
-    pdf.text("edit key", lx, y);
-    pdf.setTextColor(23);
-    pdf.setFont("courier", "bold");
-    pdf.text(result.editKey, vx, y);
-
-    y += 12;
-    pdf.setFont("courier", "normal");
-    pdf.setTextColor(130);
-    pdf.text("encrypted", lx, y);
-    pdf.setTextColor(23);
-    pdf.text(password ? "yes" : "no", vx, y);
-
-    y += 12;
-    pdf.setTextColor(130);
-    pdf.text("created", lx, y);
-    pdf.setTextColor(23);
-    pdf.text(new Date().toISOString().split("T")[0], vx, y);
-
-    // warning
-    pdf.setFont("courier", "normal");
-    pdf.setFontSize(8);
-    pdf.setTextColor(180);
-    pdf.text(
-      "this edit key cannot be recovered. without it you cannot edit your note.",
-      w / 2,
-      160,
-      { align: "center" }
+    const keyDoc = (
+      <Document>
+        <Page size="A4" style={ks.page}>
+          <Text style={ks.title}>&gt; noteup</Text>
+          <Text style={ks.subtitle}>edit key — keep this document safe</Text>
+          <View style={ks.box}>
+            <View style={ks.row}>
+              <Text style={ks.label}>slug</Text>
+              <Text style={ks.value}>{slug}</Text>
+            </View>
+            <View style={ks.row}>
+              <Text style={ks.label}>url</Text>
+              <Text style={ks.value}>{result.url}</Text>
+            </View>
+            <View style={ks.row}>
+              <Text style={ks.label}>edit key</Text>
+              <Text style={ks.keyValue}>{result.editKey}</Text>
+            </View>
+            <View style={ks.row}>
+              <Text style={ks.label}>encrypted</Text>
+              <Text style={ks.value}>{password ? "yes" : "no"}</Text>
+            </View>
+            <View style={ks.row}>
+              <Text style={ks.label}>created</Text>
+              <Text style={ks.value}>{new Date().toISOString().split("T")[0]}</Text>
+            </View>
+          </View>
+          <Text style={ks.warning}>
+            this edit key cannot be recovered. without it you cannot edit your note.
+          </Text>
+          <Text style={[ks.warning, { marginTop: 4 }]}>
+            store this document securely.
+          </Text>
+        </Page>
+      </Document>
     );
-    pdf.text(
-      "store this document securely.",
-      w / 2,
-      167,
-      { align: "center" }
-    );
-
-    pdf.save(`noteup-editkey-${slug}.pdf`);
-    toast("edit key pdf downloaded");
+    try {
+      const blob = await pdf(keyDoc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `noteup-editkey-${slug}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("edit key pdf downloaded");
+    } catch {
+      toast("pdf generation failed");
+    }
   };
 
   // edit mode: simple save button
