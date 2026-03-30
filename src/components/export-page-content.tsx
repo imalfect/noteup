@@ -170,74 +170,6 @@ export function ExportPageContent() {
     };
   }, [mounted, content, contentAreaHeight, fontSize, lineHeight, fontFamily, showTitle, title]);
 
-  const handleExport = useCallback(async () => {
-    if (!measureRef.current || exporting) return;
-    setExporting(true);
-
-    try {
-      // dynamically import html2pdf (client-side only)
-      const html2pdfModule = await import("html2pdf.js");
-      const html2pdf = html2pdfModule.default;
-
-      // clone the measurement container for export
-      const source = measureRef.current;
-      const clone = source.cloneNode(true) as HTMLElement;
-      clone.style.position = "absolute";
-      clone.style.left = "-9999px";
-      clone.style.top = "0";
-      document.body.appendChild(clone);
-
-      const w = orientation === "portrait" ? dims.width : dims.height;
-      const h = orientation === "portrait" ? dims.height : dims.width;
-
-      await html2pdf()
-        .set({
-          margin: marginMm,
-          filename: `${title}.pdf`,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 3, useCORS: true, backgroundColor: bgColor },
-          jsPDF: { unit: "mm", format: [w, h], orientation },
-          pagebreak: { mode: ["avoid-all", "css", "legacy"] },
-        })
-        .from(clone)
-        .save();
-
-      document.body.removeChild(clone);
-      toast("pdf exported");
-    } catch (err) {
-      console.error("pdf export failed", err);
-      toast("export failed");
-    } finally {
-      setExporting(false);
-    }
-  }, [
-    exporting,
-    title,
-    pageSize,
-    orientation,
-    fontFamilyCSS,
-    fontSize,
-    lineHeight,
-    marginMm,
-    darkMode,
-    showPageNumbers,
-    showTitle,
-    dims,
-    bgColor,
-  ]);
-
-  if (!mounted) {
-    return (
-      <div className="h-dvh flex items-center justify-center">
-        <span className="font-mono text-xs text-muted-foreground animate-pulse">
-          loading...
-        </span>
-      </div>
-    );
-  }
-
-  const previewScale = 0.65;
-
   // inline styles for the export content (applied to both measure container and page cards)
   const exportContentStyles = `
     .export-content, .export-content * { font-family: ${fontFamilyCSS}; color: ${fgColor}; }
@@ -289,6 +221,113 @@ export function ExportPageContent() {
     .export-content .hljs-symbol, .export-content .hljs-bullet { color: ${hljs.variable} !important; }
     .export-content .hljs-deletion { color: ${hljs.keyword} !important; }
   `;
+
+  const handleExport = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+
+    try {
+      const html2pdfModule = await import("html2pdf.js");
+      const html2pdf = html2pdfModule.default;
+
+      const w = orientation === "portrait" ? dims.width : dims.height;
+      const h = orientation === "portrait" ? dims.height : dims.width;
+      const contentWidthPx = (w * 96) / 25.4 - 2 * (marginMm * 96) / 25.4;
+
+      // build a temporary container on-screen (but visually hidden via opacity)
+      // html2canvas requires the element to be in the layout flow
+      const wrapper = document.createElement("div");
+      wrapper.style.position = "fixed";
+      wrapper.style.top = "0";
+      wrapper.style.left = "0";
+      wrapper.style.width = `${contentWidthPx}px`;
+      wrapper.style.zIndex = "-9999";
+      wrapper.style.opacity = "0";
+      wrapper.style.pointerEvents = "none";
+      wrapper.className = "export-content";
+      wrapper.style.fontFamily = fontFamilyCSS;
+      wrapper.style.fontSize = `${fontSize}px`;
+      wrapper.style.lineHeight = `${lineHeight}`;
+      wrapper.style.color = fgColor;
+      wrapper.style.backgroundColor = bgColor;
+
+      // add styles
+      const styleEl = document.createElement("style");
+      styleEl.textContent = exportContentStyles;
+      wrapper.appendChild(styleEl);
+
+      // add title
+      if (showTitle) {
+        const titleEl = document.createElement("h1");
+        titleEl.textContent = title;
+        titleEl.style.fontSize = `${fontSize * 1.5}px`;
+        titleEl.style.fontWeight = "700";
+        titleEl.style.marginBottom = `${fontSize}px`;
+        titleEl.style.paddingBottom = `${fontSize * 0.5}px`;
+        titleEl.style.borderBottom = `1px solid ${borderColor}`;
+        titleEl.style.color = fgColor;
+        wrapper.appendChild(titleEl);
+      }
+
+      // clone the rendered markdown content from the measure container
+      const mdContent = measureRef.current?.querySelector(".markdown-preview");
+      if (mdContent) {
+        const mdClone = mdContent.cloneNode(true) as HTMLElement;
+        wrapper.appendChild(mdClone);
+      }
+
+      document.body.appendChild(wrapper);
+
+      // wait for layout
+      await new Promise((r) => setTimeout(r, 100));
+
+      await html2pdf()
+        .set({
+          margin: marginMm,
+          filename: `${title}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 3, useCORS: true, backgroundColor: bgColor },
+          jsPDF: { unit: "mm", format: [w, h], orientation },
+          pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+        })
+        .from(wrapper)
+        .save();
+
+      document.body.removeChild(wrapper);
+      toast("pdf exported");
+    } catch (err) {
+      console.error("pdf export failed", err);
+      toast("export failed");
+    } finally {
+      setExporting(false);
+    }
+  }, [
+    exporting,
+    title,
+    orientation,
+    fontFamilyCSS,
+    fontSize,
+    lineHeight,
+    marginMm,
+    showTitle,
+    dims,
+    bgColor,
+    fgColor,
+    borderColor,
+    exportContentStyles,
+  ]);
+
+  if (!mounted) {
+    return (
+      <div className="h-dvh flex items-center justify-center">
+        <span className="font-mono text-xs text-muted-foreground animate-pulse">
+          loading...
+        </span>
+      </div>
+    );
+  }
+
+  const previewScale = 0.65;
 
   const titleHtml = showTitle ? (
     <h1
