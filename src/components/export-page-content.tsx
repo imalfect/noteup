@@ -5,10 +5,9 @@ import { MarkdownPreview } from "@/components/markdown-preview";
 import { Title } from "@/components/title";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Minus, Plus, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowLeft, Download, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { jsPDF } from "jspdf";
 
 type PageSize = "a4" | "letter" | "a3" | "a5";
 type Orientation = "portrait" | "landscape";
@@ -24,18 +23,15 @@ const PAGE_SIZES: Record<
 };
 
 const FONT_OPTIONS = [
-  // monospace
   { value: "jetbrains-mono", label: "JetBrains Mono", css: "'JetBrains Mono', monospace", group: "monospace" },
   { value: "fira-code", label: "Fira Code", css: "'Fira Code', monospace", group: "monospace" },
   { value: "sf-mono", label: "SF Mono", css: "'SF Mono', monospace", group: "monospace" },
   { value: "courier-new", label: "Courier New", css: "'Courier New', monospace", group: "monospace" },
-  // sans-serif
   { value: "inter", label: "Inter", css: "'Inter', sans-serif", group: "sans-serif" },
   { value: "figtree", label: "Figtree", css: "'Figtree', sans-serif", group: "sans-serif" },
   { value: "lato", label: "Lato", css: "'Lato', sans-serif", group: "sans-serif" },
   { value: "dm-sans", label: "DM Sans", css: "'DM Sans', sans-serif", group: "sans-serif" },
   { value: "system", label: "System", css: "system-ui, sans-serif", group: "sans-serif" },
-  // serif
   { value: "times-new-roman", label: "Times New Roman", css: "'Times New Roman', serif", group: "serif" },
   { value: "georgia", label: "Georgia", css: "'Georgia', serif", group: "serif" },
   { value: "merriweather", label: "Merriweather", css: "'Merriweather', serif", group: "serif" },
@@ -78,6 +74,220 @@ function Checkbox({
   );
 }
 
+/**
+ * Build a fully self-contained HTML document string for the print iframe.
+ * All styles are inlined — no CSS variables, no external sheets needed
+ * beyond Google Fonts and KaTeX/hljs which we inline-import.
+ */
+function buildPrintHtml(opts: {
+  contentHtml: string;
+  title: string;
+  showTitle: boolean;
+  pageSize: PageSize;
+  orientation: Orientation;
+  fontFamilyCSS: string;
+  fontSize: number;
+  lineHeight: number;
+  marginMm: number;
+  darkMode: boolean;
+  showPageNumbers: boolean;
+}) {
+  const {
+    contentHtml,
+    title,
+    showTitle,
+    pageSize,
+    orientation,
+    fontFamilyCSS,
+    fontSize,
+    lineHeight,
+    marginMm,
+    darkMode,
+    showPageNumbers,
+  } = opts;
+
+  const bg = darkMode ? "#080808" : "#ffffff";
+  const fg = darkMode ? "#ededed" : "#171717";
+  const muted = darkMode ? "#808080" : "#808080";
+  const border = darkMode ? "#333333" : "#dddddd";
+  const codeBg = darkMode ? "#111111" : "#f5f5f5";
+
+  // hljs colors: GitHub light / GitHub dark
+  const hljs = darkMode
+    ? {
+        base: "#c9d1d9",
+        keyword: "#ff7b72",
+        string: "#a5d6ff",
+        title: "#d2a8ff",
+        type: "#79c0ff",
+        number: "#79c0ff",
+        comment: "#8b949e",
+        variable: "#ffa657",
+        attr: "#79c0ff",
+        symbol: "#f2cc60",
+        deletion: "#ffa198",
+        addition: "#aff5b4",
+      }
+    : {
+        base: "#24292e",
+        keyword: "#d73a49",
+        string: "#032f62",
+        title: "#6f42c1",
+        type: "#005cc5",
+        number: "#005cc5",
+        comment: "#6a737d",
+        variable: "#e36209",
+        attr: "#005cc5",
+        symbol: "#e36209",
+        deletion: "#b31d28",
+        addition: "#22863a",
+      };
+
+  const dims = PAGE_SIZES[pageSize];
+  const w = orientation === "portrait" ? dims.width : dims.height;
+  const h = orientation === "portrait" ? dims.height : dims.width;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${title}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Figtree:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Lato:wght@400;700&family=Lora:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<style>
+  @page {
+    size: ${w}mm ${h}mm;
+    margin: ${marginMm}mm;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: ${fontFamilyCSS};
+    font-size: ${fontSize}px;
+    line-height: ${lineHeight};
+    color: ${fg};
+    background: ${bg};
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  ${showPageNumbers ? `
+  @page { @bottom-center { content: counter(page) " / " counter(pages); font-size: 8px; color: ${muted}; font-family: ${fontFamilyCSS}; } }
+  ` : ""}
+
+  /* title */
+  .doc-title {
+    font-size: ${fontSize * 1.5}px;
+    font-weight: 700;
+    margin-bottom: ${fontSize}px;
+    padding-bottom: ${fontSize * 0.5}px;
+    border-bottom: 1px solid ${border};
+    color: ${fg};
+  }
+
+  /* headings */
+  h1 { font-size: 1.5em; font-weight: 700; margin: 1em 0 0.5em; padding-bottom: 0.25em; border-bottom: 1px solid ${border}; }
+  h2 { font-size: 1.3em; font-weight: 600; margin: 0.9em 0 0.4em; }
+  h3 { font-size: 1.15em; font-weight: 600; margin: 0.8em 0 0.4em; }
+  h4, h5, h6 { font-size: 1em; font-weight: 600; margin: 0.6em 0 0.3em; }
+
+  /* text */
+  p { margin: 0.4em 0; }
+  a { color: ${fg}; text-decoration: underline; text-underline-offset: 2px; }
+
+  /* blockquote */
+  blockquote { border-left: 3px solid ${border}; padding-left: 1em; color: ${muted}; margin: 0.75em 0; }
+  blockquote * { color: ${muted}; }
+
+  /* lists */
+  ul, ol { padding-left: 1.5em; margin: 0.5em 0; }
+  ul { list-style-type: disc; }
+  ol { list-style-type: decimal; }
+  li { margin: 0.15em 0; }
+
+  /* code */
+  pre {
+    background: ${codeBg};
+    border: 1px solid ${border};
+    padding: 0.75em;
+    overflow-x: auto;
+    margin: 0.75em 0;
+    font-size: 0.85em;
+    line-height: 1.5;
+    page-break-inside: avoid;
+  }
+  pre, pre *, code {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  }
+  pre code { font-size: inherit; background: none; padding: 0; border: none; }
+  :not(pre) > code {
+    background: ${codeBg};
+    padding: 0.15em 0.3em;
+    border: 1px solid ${border};
+    font-size: 0.9em;
+  }
+
+  /* tables */
+  table { border-collapse: collapse; width: 100%; margin: 0.75em 0; font-size: 0.9em; page-break-inside: avoid; }
+  th, td { border: 1px solid ${border}; padding: 0.35em 0.5em; text-align: left; }
+  th { font-weight: 600; background: ${codeBg}; }
+
+  /* hr */
+  hr { border: none; border-top: 1px solid ${border}; margin: 1em 0; }
+
+  /* images */
+  img { max-width: 100%; page-break-inside: avoid; }
+
+  /* task list */
+  ul[data-type="taskList"] { list-style: none; padding-left: 0; }
+  input[type="checkbox"] { margin-right: 0.5em; }
+
+  /* details */
+  details { border: 1px solid ${border}; margin: 0.75em 0; page-break-inside: avoid; }
+  details summary { padding: 0.5em 0.75em; font-weight: 500; background: ${codeBg}; }
+  details[open] summary { border-bottom: 1px solid ${border}; }
+  details > *:not(summary) { padding: 0 0.75em; }
+  details > p:first-of-type { margin-top: 0.5em; }
+  details > *:last-child { margin-bottom: 0.75em; }
+
+  /* syntax highlighting */
+  .hljs { background: ${codeBg}; color: ${hljs.base}; }
+  .hljs-keyword, .hljs-selector-tag { color: ${hljs.keyword}; }
+  .hljs-string, .hljs-addition { color: ${hljs.string}; }
+  .hljs-title, .hljs-section, .hljs-name { color: ${hljs.title}; }
+  .hljs-type, .hljs-built_in { color: ${hljs.type}; }
+  .hljs-number { color: ${hljs.number}; }
+  .hljs-comment, .hljs-quote, .hljs-meta { color: ${hljs.comment}; }
+  .hljs-variable, .hljs-template-variable { color: ${hljs.variable}; }
+  .hljs-attr { color: ${hljs.attr}; }
+  .hljs-symbol, .hljs-bullet { color: ${hljs.symbol}; }
+  .hljs-deletion { color: ${hljs.deletion}; }
+  .hljs-literal { color: ${hljs.keyword}; }
+  .hljs-link { color: ${hljs.string}; }
+  .hljs-regexp { color: ${hljs.string}; }
+  .hljs-attribute { color: ${hljs.attr}; }
+  .hljs-tag { color: ${hljs.keyword}; }
+  .hljs-selector-id, .hljs-selector-class { color: ${hljs.variable}; }
+
+  /* katex */
+  .katex { font-size: 1em; }
+  .katex-display { margin: 0.75em 0; overflow-x: auto; }
+
+  /* page break helpers */
+  h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }
+  p { orphans: 3; widows: 3; }
+</style>
+</head>
+<body>
+${showTitle ? `<h1 class="doc-title">${title.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</h1>` : ""}
+${contentHtml}
+</body>
+</html>`;
+}
+
 export function ExportPageContent() {
   const searchParams = useSearchParams();
   const isDraft = searchParams.get("draft") === "true";
@@ -96,10 +306,7 @@ export function ExportPageContent() {
   const [lineHeight, setLineHeight] = useState(1.6);
 
   const previewRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [exporting, setExporting] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -125,18 +332,17 @@ export function ExportPageContent() {
   }, [isDraft]);
 
   const dims = PAGE_SIZES[pageSize];
-  const effectiveWidth =
-    orientation === "portrait" ? dims.width : dims.height;
-  const effectiveHeight =
-    orientation === "portrait" ? dims.height : dims.width;
+  const effectiveWidth = orientation === "portrait" ? dims.width : dims.height;
+  const effectiveHeight = orientation === "portrait" ? dims.height : dims.width;
 
   const mmToPx = (mm: number) => (mm * 96) / 25.4;
-  const previewScale = 0.85;
   const pageWidthPx = mmToPx(effectiveWidth);
   const pageHeightPx = mmToPx(effectiveHeight);
   const marginPx = mmToPx(marginMm);
 
-  const fontFamilyCSS = FONT_OPTIONS.find((f) => f.value === fontFamily)?.css || "'Courier New', monospace";
+  const fontFamilyCSS =
+    FONT_OPTIONS.find((f) => f.value === fontFamily)?.css ||
+    "'Courier New', monospace";
 
   const bgColor = darkMode ? "#080808" : "#ffffff";
   const fgColor = darkMode ? "#ededed" : "#171717";
@@ -144,107 +350,65 @@ export function ExportPageContent() {
   const borderColor = darkMode ? "#333333" : "#dddddd";
   const codeBgColor = darkMode ? "#111111" : "#f5f5f5";
 
-  // estimate total pages from content height
-  useEffect(() => {
+  // hljs colors matching buildPrintHtml
+  const hljs = darkMode
+    ? { base: "#c9d1d9", keyword: "#ff7b72", string: "#a5d6ff", title: "#d2a8ff", type: "#79c0ff", number: "#79c0ff", comment: "#8b949e", variable: "#ffa657" }
+    : { base: "#24292e", keyword: "#d73a49", string: "#032f62", title: "#6f42c1", type: "#005cc5", number: "#005cc5", comment: "#6a737d", variable: "#e36209" };
+
+  const handleExport = useCallback(() => {
     if (!previewRef.current) return;
-    const contentEl = previewRef.current.querySelector("[data-pdf-content]") as HTMLElement;
+
+    const contentEl = previewRef.current.querySelector(
+      ".markdown-preview"
+    );
     if (!contentEl) return;
-    const observer = new ResizeObserver(() => {
-      // subtract padding to get actual content height
-      const contentHeight = contentEl.scrollHeight - marginPx * 2;
-      const usableHeight = pageHeightPx - marginPx * 2;
-      const pages = Math.max(1, Math.ceil(contentHeight / usableHeight));
-      setTotalPages(pages);
+
+    const html = buildPrintHtml({
+      contentHtml: contentEl.innerHTML,
+      title,
+      showTitle,
+      pageSize,
+      orientation,
+      fontFamilyCSS,
+      fontSize,
+      lineHeight,
+      marginMm,
+      darkMode,
+      showPageNumbers,
     });
-    observer.observe(contentEl);
-    return () => observer.disconnect();
-  }, [content, pageHeightPx, marginPx, fontSize, lineHeight, fontFamily, showTitle]);
 
-  // track scroll position to determine current page
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const handleScroll = () => {
-      const scrollTop = container.scrollTop;
-      const scaledPageHeight = pageHeightPx * previewScale;
-      const pageGap = 32 * previewScale;
-      const page = Math.floor(scrollTop / (scaledPageHeight + pageGap)) + 1;
-      setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-    };
-    container.addEventListener("scroll", handleScroll);
-    return () => container.removeEventListener("scroll", handleScroll);
-  }, [pageHeightPx, previewScale, totalPages]);
-
-  const scrollToPage = (page: number) => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const clamped = Math.max(1, Math.min(page, totalPages));
-    const scaledPageHeight = pageHeightPx * previewScale;
-    const pageGap = 32 * previewScale;
-    container.scrollTo({
-      top: (clamped - 1) * (scaledPageHeight + pageGap),
-      behavior: "smooth",
-    });
-    setCurrentPage(clamped);
-  };
-
-  const handleExport = useCallback(async () => {
-    if (!previewRef.current) return;
-    setExporting(true);
-    toast("generating pdf...");
-
-    try {
-      const pdf = new jsPDF({
-        orientation: orientation === "portrait" ? "p" : "l",
-        unit: "mm",
-        format: pageSize === "letter" ? "letter" : pageSize,
-      });
-
-      const contentEl = previewRef.current.querySelector(
-        "[data-pdf-content]"
-      ) as HTMLElement;
-      if (!contentEl) return;
-
-      await pdf.html(contentEl, {
-        callback: (doc) => {
-          if (showPageNumbers) {
-            const total = doc.getNumberOfPages();
-            for (let i = 1; i <= total; i++) {
-              doc.setPage(i);
-              doc.setFontSize(8);
-              doc.setTextColor(128);
-              doc.text(
-                `${i} / ${total}`,
-                effectiveWidth / 2,
-                effectiveHeight - 8,
-                { align: "center" }
-              );
-            }
-          }
-          doc.save(`${title}.pdf`);
-          toast("pdf exported");
-          setExporting(false);
-        },
-        x: marginMm,
-        y: marginMm,
-        width: effectiveWidth - marginMm * 2,
-        windowWidth: pageWidthPx - marginPx * 2,
-        margin: [marginMm, marginMm, marginMm, marginMm],
-      });
-    } catch (err) {
-      console.error("pdf export error:", err);
-      toast("export failed — try again");
-      setExporting(false);
+    // open in a new window for print
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast("popup blocked — allow popups for this site");
+      return;
     }
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    // wait for fonts/katex to load, then print
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    };
+
+    // fallback if onload doesn't fire
+    setTimeout(() => {
+      if (!printWindow.closed) {
+        printWindow.print();
+      }
+    }, 2000);
   }, [
-    orientation,
-    pageSize,
-    marginMm,
-    effectiveWidth,
-    effectiveHeight,
-    pageWidthPx,
-    marginPx,
     title,
+    showTitle,
+    pageSize,
+    orientation,
+    fontFamilyCSS,
+    fontSize,
+    lineHeight,
+    marginMm,
+    darkMode,
     showPageNumbers,
   ]);
 
@@ -257,6 +421,9 @@ export function ExportPageContent() {
       </div>
     );
   }
+
+  // preview scale so the page fits the panel
+  const previewScale = 0.65;
 
   return (
     <div className="h-dvh flex flex-col">
@@ -276,11 +443,11 @@ export function ExportPageContent() {
         <ThemeToggle />
         <button
           onClick={handleExport}
-          disabled={exporting || !content}
+          disabled={!content}
           className="ml-2 border border-border bg-foreground text-background px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-1.5"
         >
           <Download className="h-3 w-3" />
-          {exporting ? "exporting..." : "export pdf"}
+          export pdf
         </button>
       </div>
 
@@ -441,153 +608,99 @@ export function ExportPageContent() {
           >
             page numbers
           </Checkbox>
+
+          <div className="border border-border p-3 font-mono text-xs text-muted-foreground space-y-1">
+            <p>export opens your browser&apos;s print dialog.</p>
+            <p>select &quot;save as pdf&quot; as the destination for a pdf file.</p>
+          </div>
         </div>
 
-        {/* preview — fully self-contained, no CSS variable colors */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* live preview */}
+        <div className="flex-1 overflow-auto bg-muted p-8 flex justify-center">
           <div
-            ref={scrollContainerRef}
-            className="flex-1 overflow-auto bg-muted p-8 flex justify-center"
+            style={{
+              transform: `scale(${previewScale})`,
+              transformOrigin: "top center",
+            }}
           >
             <div
               ref={previewRef}
               style={{
-                transform: `scale(${previewScale})`,
-                transformOrigin: "top center",
+                width: `${pageWidthPx}px`,
+                minHeight: `${pageHeightPx}px`,
+                padding: `${marginPx}px`,
+                backgroundColor: bgColor,
+                color: fgColor,
+                fontFamily: fontFamilyCSS,
+                fontSize: `${fontSize}px`,
+                lineHeight: lineHeight,
+                boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+                backgroundImage: `repeating-linear-gradient(
+                  to bottom,
+                  transparent,
+                  transparent ${pageHeightPx - 1}px,
+                  ${darkMode ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.1)"} ${pageHeightPx - 1}px,
+                  ${darkMode ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.1)"} ${pageHeightPx}px
+                )`,
+                backgroundSize: `100% ${pageHeightPx}px`,
               }}
             >
-              <div
-                data-pdf-content
-                style={{
-                  width: `${pageWidthPx}px`,
-                  minHeight: `${pageHeightPx}px`,
-                  padding: `${marginPx}px`,
-                  backgroundColor: bgColor,
-                  color: fgColor,
-                  fontFamily: fontFamilyCSS,
-                  fontSize: `${fontSize}px`,
-                  lineHeight: lineHeight,
-                  boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
-                }}
-              >
-                <style>{`
-                  [data-pdf-content] .markdown-preview,
-                  [data-pdf-content] .markdown-preview * {
-                    font-family: inherit !important;
-                    color: inherit !important;
-                    font-size: inherit !important;
-                    line-height: inherit !important;
-                  }
-                  [data-pdf-content] .markdown-preview h1 {
-                    font-size: 1.5em !important;
-                    font-weight: 700;
-                    margin: 1em 0 0.5em;
-                    padding-bottom: 0.25em;
-                    border-bottom: 1px solid ${borderColor};
-                  }
-                  [data-pdf-content] .markdown-preview h2 {
-                    font-size: 1.3em !important;
-                    font-weight: 600;
-                    margin: 0.9em 0 0.4em;
-                  }
-                  [data-pdf-content] .markdown-preview h3 {
-                    font-size: 1.15em !important;
-                    font-weight: 600;
-                    margin: 0.8em 0 0.4em;
-                  }
-                  [data-pdf-content] .markdown-preview h4,
-                  [data-pdf-content] .markdown-preview h5,
-                  [data-pdf-content] .markdown-preview h6 {
-                    font-size: 1em !important;
-                    font-weight: 600;
-                    margin: 0.6em 0 0.3em;
-                  }
-                  [data-pdf-content] .markdown-preview p {
-                    margin: 0.4em 0;
-                  }
-                  [data-pdf-content] a {
-                    text-decoration: underline;
-                    text-underline-offset: 2px;
-                  }
-                  [data-pdf-content] blockquote {
-                    border-left: 2px solid ${borderColor};
-                    padding-left: 1rem;
-                    color: ${mutedColor} !important;
-                    margin: 0.75rem 0;
-                  }
-                  [data-pdf-content] blockquote * {
-                    color: ${mutedColor} !important;
-                  }
-                  [data-pdf-content] pre {
-                    background: ${codeBgColor} !important;
-                    border: 1px solid ${borderColor};
-                    padding: 0.75rem;
-                    overflow-x: auto;
-                    margin: 0.75rem 0;
-                    font-size: 0.85em !important;
-                  }
-                  [data-pdf-content] pre *,
-                  [data-pdf-content] code {
-                    font-family: "Courier New", monospace !important;
-                  }
-                  [data-pdf-content] :not(pre) > code {
-                    background: ${codeBgColor} !important;
-                    padding: 0.15rem 0.3rem;
-                    border: 1px solid ${borderColor};
-                    font-size: 0.85em !important;
-                  }
-                  [data-pdf-content] th {
-                    background: ${codeBgColor} !important;
-                  }
-                  [data-pdf-content] th,
-                  [data-pdf-content] td {
-                    border-color: ${borderColor} !important;
-                  }
-                  [data-pdf-content] hr {
-                    border-color: ${borderColor} !important;
-                  }
-                  [data-pdf-content] .katex * {
-                    color: ${fgColor} !important;
-                  }
-                  [data-pdf-content] .hljs,
-                  [data-pdf-content] pre {
-                    background: ${codeBgColor} !important;
-                    color: ${fgColor} !important;
-                  }
-                  [data-pdf-content] .hljs-keyword,
-                  [data-pdf-content] .hljs-selector-tag,
-                  [data-pdf-content] .hljs-literal,
-                  [data-pdf-content] .hljs-section,
-                  [data-pdf-content] .hljs-link {
-                    color: ${darkMode ? "#c678dd" : "#a626a4"} !important;
-                  }
-                  [data-pdf-content] .hljs-string,
-                  [data-pdf-content] .hljs-title,
-                  [data-pdf-content] .hljs-name,
-                  [data-pdf-content] .hljs-type,
-                  [data-pdf-content] .hljs-attribute,
-                  [data-pdf-content] .hljs-symbol,
-                  [data-pdf-content] .hljs-bullet,
-                  [data-pdf-content] .hljs-addition,
-                  [data-pdf-content] .hljs-variable,
-                  [data-pdf-content] .hljs-template-tag,
-                  [data-pdf-content] .hljs-template-variable {
-                    color: ${darkMode ? "#98c379" : "#50a14f"} !important;
-                  }
-                  [data-pdf-content] .hljs-comment,
-                  [data-pdf-content] .hljs-quote,
-                  [data-pdf-content] .hljs-deletion,
-                  [data-pdf-content] .hljs-meta {
-                    color: ${darkMode ? "#5c6370" : "#a0a1a7"} !important;
-                  }
-                  [data-pdf-content] .hljs-number,
-                  [data-pdf-content] .hljs-regexp,
-                  [data-pdf-content] .hljs-literal,
-                  [data-pdf-content] .hljs-built_in {
-                    color: ${darkMode ? "#d19a66" : "#986801"} !important;
-                  }
-                `}</style>
+              {/* self-contained inline overrides for the preview panel */}
+              <style>{`
+                [data-export-preview] .markdown-preview,
+                [data-export-preview] .markdown-preview * {
+                  font-family: inherit !important;
+                  color: inherit !important;
+                }
+                [data-export-preview] .markdown-preview h1 { font-size: 1.5em !important; font-weight: 700; margin: 1em 0 0.5em; padding-bottom: 0.25em; border-bottom: 1px solid ${borderColor}; }
+                [data-export-preview] .markdown-preview h2 { font-size: 1.3em !important; font-weight: 600; margin: 0.9em 0 0.4em; }
+                [data-export-preview] .markdown-preview h3 { font-size: 1.15em !important; font-weight: 600; margin: 0.8em 0 0.4em; }
+                [data-export-preview] .markdown-preview h4,
+                [data-export-preview] .markdown-preview h5,
+                [data-export-preview] .markdown-preview h6 { font-size: 1em !important; font-weight: 600; margin: 0.6em 0 0.3em; }
+                [data-export-preview] .markdown-preview p { margin: 0.4em 0; }
+                [data-export-preview] a { text-decoration: underline; text-underline-offset: 2px; }
+                [data-export-preview] blockquote { border-left: 3px solid ${borderColor}; padding-left: 1em; color: ${mutedColor} !important; margin: 0.75em 0; }
+                [data-export-preview] blockquote * { color: ${mutedColor} !important; }
+                [data-export-preview] pre {
+                  background: ${codeBgColor} !important;
+                  border: 1px solid ${borderColor};
+                  padding: 0.75em;
+                  overflow-x: auto;
+                  margin: 0.75em 0;
+                  font-size: 0.85em !important;
+                  line-height: 1.5;
+                }
+                [data-export-preview] pre, [data-export-preview] pre *, [data-export-preview] code {
+                  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace !important;
+                }
+                [data-export-preview] pre code { font-size: inherit !important; background: none !important; padding: 0 !important; border: none !important; }
+                [data-export-preview] :not(pre) > code { background: ${codeBgColor} !important; padding: 0.15em 0.3em; border: 1px solid ${borderColor}; font-size: 0.9em !important; }
+                [data-export-preview] th { background: ${codeBgColor} !important; }
+                [data-export-preview] th, [data-export-preview] td { border-color: ${borderColor} !important; }
+                [data-export-preview] hr { border-color: ${borderColor} !important; }
+                [data-export-preview] .katex * { color: ${fgColor} !important; }
+                [data-export-preview] details { border: 1px solid ${borderColor}; margin: 0.75em 0; }
+                [data-export-preview] details summary { padding: 0.5em 0.75em; font-weight: 500; background: ${codeBgColor}; }
+                [data-export-preview] details[open] summary { border-bottom: 1px solid ${borderColor}; }
+                [data-export-preview] details > *:not(summary) { padding: 0 0.75em; }
+                [data-export-preview] img { max-width: 100%; }
 
+                /* syntax highlighting */
+                [data-export-preview] .hljs { background: ${codeBgColor} !important; color: ${hljs.base} !important; }
+                [data-export-preview] .hljs-keyword, [data-export-preview] .hljs-selector-tag, [data-export-preview] .hljs-literal, [data-export-preview] .hljs-tag { color: ${hljs.keyword} !important; }
+                [data-export-preview] .hljs-string, [data-export-preview] .hljs-addition, [data-export-preview] .hljs-link, [data-export-preview] .hljs-regexp { color: ${hljs.string} !important; }
+                [data-export-preview] .hljs-title, [data-export-preview] .hljs-section, [data-export-preview] .hljs-name { color: ${hljs.title} !important; }
+                [data-export-preview] .hljs-type, [data-export-preview] .hljs-built_in { color: ${hljs.type} !important; }
+                [data-export-preview] .hljs-number { color: ${hljs.number} !important; }
+                [data-export-preview] .hljs-comment, [data-export-preview] .hljs-quote, [data-export-preview] .hljs-meta { color: ${hljs.comment} !important; }
+                [data-export-preview] .hljs-variable, [data-export-preview] .hljs-template-variable, [data-export-preview] .hljs-selector-id, [data-export-preview] .hljs-selector-class { color: ${hljs.variable} !important; }
+                [data-export-preview] .hljs-attr, [data-export-preview] .hljs-attribute { color: ${hljs.type} !important; }
+                [data-export-preview] .hljs-symbol, [data-export-preview] .hljs-bullet { color: ${hljs.variable} !important; }
+                [data-export-preview] .hljs-deletion { color: ${hljs.keyword} !important; }
+              `}</style>
+
+              <div data-export-preview>
                 {showTitle && (
                   <h1
                     style={{
@@ -597,7 +710,6 @@ export function ExportPageContent() {
                       paddingBottom: `${fontSize * 0.5}px`,
                       borderBottom: `1px solid ${borderColor}`,
                       color: fgColor,
-                      fontFamily: fontFamilyCSS,
                     }}
                   >
                     {title}
@@ -609,31 +721,11 @@ export function ExportPageContent() {
               </div>
             </div>
           </div>
-
-          {/* page navigation bar */}
-          <div className="flex items-center justify-center gap-3 border-t border-border px-4 py-2 bg-card">
-            <button
-              onClick={() => scrollToPage(currentPage - 1)}
-              disabled={currentPage <= 1}
-              className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
-              title="previous page"
-            >
-              <ChevronUp className="h-3.5 w-3.5" />
-            </button>
-            <span className="font-mono text-xs text-muted-foreground">
-              page {currentPage} / {totalPages}
-            </span>
-            <button
-              onClick={() => scrollToPage(currentPage + 1)}
-              disabled={currentPage >= totalPages}
-              className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
-              title="next page"
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          </div>
         </div>
       </div>
+
+      {/* hidden iframe for potential future use */}
+      <iframe ref={iframeRef} className="hidden" title="print" />
     </div>
   );
 }
