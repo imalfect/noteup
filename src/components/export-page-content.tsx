@@ -74,226 +74,13 @@ function Checkbox({
   );
 }
 
-/**
- * Build a fully self-contained HTML document string for the print iframe.
- * All styles are inlined — no CSS variables, no external sheets needed
- * beyond Google Fonts and KaTeX/hljs which we inline-import.
- */
-function buildPrintHtml(opts: {
-  contentHtml: string;
-  title: string;
-  showTitle: boolean;
-  pageSize: PageSize;
-  orientation: Orientation;
-  fontFamilyCSS: string;
-  fontSize: number;
-  lineHeight: number;
-  marginMm: number;
-  darkMode: boolean;
-  showPageNumbers: boolean;
-}) {
-  const {
-    contentHtml,
-    title,
-    showTitle,
-    pageSize,
-    orientation,
-    fontFamilyCSS,
-    fontSize,
-    lineHeight,
-    marginMm,
-    darkMode,
-    showPageNumbers,
-  } = opts;
-
-  const bg = darkMode ? "#080808" : "#ffffff";
-  const fg = darkMode ? "#ededed" : "#171717";
-  const muted = darkMode ? "#808080" : "#808080";
-  const border = darkMode ? "#333333" : "#dddddd";
-  const codeBg = darkMode ? "#111111" : "#f5f5f5";
-
-  // hljs colors: GitHub light / GitHub dark
-  const hljs = darkMode
-    ? {
-        base: "#c9d1d9",
-        keyword: "#ff7b72",
-        string: "#a5d6ff",
-        title: "#d2a8ff",
-        type: "#79c0ff",
-        number: "#79c0ff",
-        comment: "#8b949e",
-        variable: "#ffa657",
-        attr: "#79c0ff",
-        symbol: "#f2cc60",
-        deletion: "#ffa198",
-        addition: "#aff5b4",
-      }
-    : {
-        base: "#24292e",
-        keyword: "#d73a49",
-        string: "#032f62",
-        title: "#6f42c1",
-        type: "#005cc5",
-        number: "#005cc5",
-        comment: "#6a737d",
-        variable: "#e36209",
-        attr: "#005cc5",
-        symbol: "#e36209",
-        deletion: "#b31d28",
-        addition: "#22863a",
-      };
-
-  const dims = PAGE_SIZES[pageSize];
-  const w = orientation === "portrait" ? dims.width : dims.height;
-  const h = orientation === "portrait" ? dims.height : dims.width;
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>${title}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Figtree:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Lato:wght@400;700&family=Lora:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<style>
-  @page {
-    size: ${w}mm ${h}mm;
-    margin: ${marginMm}mm;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: ${fontFamilyCSS};
-    font-size: ${fontSize}px;
-    line-height: ${lineHeight};
-    color: ${fg};
-    background: ${bg};
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  ${showPageNumbers ? `
-  @page { @bottom-center { content: counter(page) " / " counter(pages); font-size: 8px; color: ${muted}; font-family: ${fontFamilyCSS}; } }
-  ` : ""}
-
-  /* title */
-  .doc-title {
-    font-size: ${fontSize * 1.5}px;
-    font-weight: 700;
-    margin-bottom: ${fontSize}px;
-    padding-bottom: ${fontSize * 0.5}px;
-    border-bottom: 1px solid ${border};
-    color: ${fg};
-  }
-
-  /* headings */
-  h1 { font-size: 1.5em; font-weight: 700; margin: 1em 0 0.5em; padding-bottom: 0.25em; border-bottom: 1px solid ${border}; }
-  h2 { font-size: 1.3em; font-weight: 600; margin: 0.9em 0 0.4em; }
-  h3 { font-size: 1.15em; font-weight: 600; margin: 0.8em 0 0.4em; }
-  h4, h5, h6 { font-size: 1em; font-weight: 600; margin: 0.6em 0 0.3em; }
-
-  /* text */
-  p { margin: 0.4em 0; }
-  a { color: ${fg}; text-decoration: underline; text-underline-offset: 2px; }
-
-  /* blockquote */
-  blockquote { border-left: 3px solid ${border}; padding-left: 1em; color: ${muted}; margin: 0.75em 0; }
-  blockquote * { color: ${muted}; }
-
-  /* lists */
-  ul, ol { padding-left: 1.5em; margin: 0.5em 0; }
-  ul { list-style-type: disc; }
-  ol { list-style-type: decimal; }
-  li { margin: 0.15em 0; }
-
-  /* code */
-  pre {
-    background: ${codeBg};
-    border: 1px solid ${border};
-    padding: 0.75em;
-    overflow-x: auto;
-    margin: 0.75em 0;
-    font-size: 0.85em;
-    line-height: 1.5;
-    page-break-inside: avoid;
-  }
-  pre, pre *, code {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-  }
-  pre code { font-size: inherit; background: none; padding: 0; border: none; }
-  :not(pre) > code {
-    background: ${codeBg};
-    padding: 0.15em 0.3em;
-    border: 1px solid ${border};
-    font-size: 0.9em;
-  }
-
-  /* tables */
-  table { border-collapse: collapse; width: 100%; margin: 0.75em 0; font-size: 0.9em; page-break-inside: avoid; }
-  th, td { border: 1px solid ${border}; padding: 0.35em 0.5em; text-align: left; }
-  th { font-weight: 600; background: ${codeBg}; }
-
-  /* hr */
-  hr { border: none; border-top: 1px solid ${border}; margin: 1em 0; }
-
-  /* images */
-  img { max-width: 100%; page-break-inside: avoid; }
-
-  /* task list */
-  ul[data-type="taskList"] { list-style: none; padding-left: 0; }
-  input[type="checkbox"] { margin-right: 0.5em; }
-
-  /* details */
-  details { border: 1px solid ${border}; margin: 0.75em 0; page-break-inside: avoid; }
-  details summary { padding: 0.5em 0.75em; font-weight: 500; background: ${codeBg}; }
-  details[open] summary { border-bottom: 1px solid ${border}; }
-  details > *:not(summary) { padding: 0 0.75em; }
-  details > p:first-of-type { margin-top: 0.5em; }
-  details > *:last-child { margin-bottom: 0.75em; }
-
-  /* syntax highlighting */
-  .hljs { background: ${codeBg}; color: ${hljs.base}; }
-  .hljs-keyword, .hljs-selector-tag { color: ${hljs.keyword}; }
-  .hljs-string, .hljs-addition { color: ${hljs.string}; }
-  .hljs-title, .hljs-section, .hljs-name { color: ${hljs.title}; }
-  .hljs-type, .hljs-built_in { color: ${hljs.type}; }
-  .hljs-number { color: ${hljs.number}; }
-  .hljs-comment, .hljs-quote, .hljs-meta { color: ${hljs.comment}; }
-  .hljs-variable, .hljs-template-variable { color: ${hljs.variable}; }
-  .hljs-attr { color: ${hljs.attr}; }
-  .hljs-symbol, .hljs-bullet { color: ${hljs.symbol}; }
-  .hljs-deletion { color: ${hljs.deletion}; }
-  .hljs-literal { color: ${hljs.keyword}; }
-  .hljs-link { color: ${hljs.string}; }
-  .hljs-regexp { color: ${hljs.string}; }
-  .hljs-attribute { color: ${hljs.attr}; }
-  .hljs-tag { color: ${hljs.keyword}; }
-  .hljs-selector-id, .hljs-selector-class { color: ${hljs.variable}; }
-
-  /* katex */
-  .katex { font-size: 1em; }
-  .katex-display { margin: 0.75em 0; overflow-x: auto; }
-
-  /* page break helpers */
-  h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }
-  p { orphans: 3; widows: 3; }
-</style>
-</head>
-<body>
-${showTitle ? `<h1 class="doc-title">${title.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</h1>` : ""}
-${contentHtml}
-</body>
-</html>`;
-}
-
 export function ExportPageContent() {
   const searchParams = useSearchParams();
   const isDraft = searchParams.get("draft") === "true";
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("untitled");
   const [mounted, setMounted] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const [pageSize, setPageSize] = useState<PageSize>("a4");
   const [orientation, setOrientation] = useState<Orientation>("portrait");
@@ -305,13 +92,13 @@ export function ExportPageContent() {
   const [showTitle, setShowTitle] = useState(true);
   const [lineHeight, setLineHeight] = useState(1.6);
 
-  const previewRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  // for measuring content and paginating
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [pageCount, setPageCount] = useState(1);
+  const [measuredHeight, setMeasuredHeight] = useState(0);
 
   useEffect(() => {
     setMounted(true);
-    // always prefer sessionStorage (set by the editor right before navigating)
-    // fall back to localStorage draft
     try {
       const fromSession = sessionStorage.getItem("noteup-export");
       if (fromSession) {
@@ -341,6 +128,7 @@ export function ExportPageContent() {
   const pageWidthPx = mmToPx(effectiveWidth);
   const pageHeightPx = mmToPx(effectiveHeight);
   const marginPx = mmToPx(marginMm);
+  const contentAreaHeight = pageHeightPx - 2 * marginPx;
 
   const fontFamilyCSS =
     FONT_OPTIONS.find((f) => f.value === fontFamily)?.css ||
@@ -352,58 +140,79 @@ export function ExportPageContent() {
   const borderColor = darkMode ? "#333333" : "#dddddd";
   const codeBgColor = darkMode ? "#111111" : "#f5f5f5";
 
-  // hljs colors matching buildPrintHtml
   const hljs = darkMode
     ? { base: "#c9d1d9", keyword: "#ff7b72", string: "#a5d6ff", title: "#d2a8ff", type: "#79c0ff", number: "#79c0ff", comment: "#8b949e", variable: "#ffa657" }
     : { base: "#24292e", keyword: "#d73a49", string: "#032f62", title: "#6f42c1", type: "#005cc5", number: "#005cc5", comment: "#6a737d", variable: "#e36209" };
 
-  const handleExport = useCallback(() => {
-    if (!previewRef.current) return;
+  // measure content height after render to calculate pages
+  useEffect(() => {
+    if (!measureRef.current || !mounted) return;
 
-    const contentEl = previewRef.current.querySelector(
-      ".markdown-preview"
-    );
-    if (!contentEl) return;
-
-    const html = buildPrintHtml({
-      contentHtml: contentEl.innerHTML,
-      title,
-      showTitle,
-      pageSize,
-      orientation,
-      fontFamilyCSS,
-      fontSize,
-      lineHeight,
-      marginMm,
-      darkMode,
-      showPageNumbers,
-    });
-
-    // open in a new window for print
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      toast("popup blocked — allow popups for this site");
-      return;
-    }
-    printWindow.document.write(html);
-    printWindow.document.close();
-
-    // wait for fonts/katex to load, then print
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
+    const measure = () => {
+      const el = measureRef.current;
+      if (!el) return;
+      const h = el.scrollHeight;
+      setMeasuredHeight(h);
+      const areaH = contentAreaHeight;
+      if (areaH > 0) {
+        setPageCount(Math.max(1, Math.ceil(h / areaH)));
+      }
     };
 
-    // fallback if onload doesn't fire
-    setTimeout(() => {
-      if (!printWindow.closed) {
-        printWindow.print();
-      }
-    }, 2000);
+    // measure after fonts load and content renders
+    const timer = setTimeout(measure, 200);
+    const ro = new ResizeObserver(measure);
+    ro.observe(measureRef.current);
+
+    return () => {
+      clearTimeout(timer);
+      ro.disconnect();
+    };
+  }, [mounted, content, contentAreaHeight, fontSize, lineHeight, fontFamily, showTitle, title]);
+
+  const handleExport = useCallback(async () => {
+    if (!measureRef.current || exporting) return;
+    setExporting(true);
+
+    try {
+      // dynamically import html2pdf (client-side only)
+      const html2pdfModule = await import("html2pdf.js");
+      const html2pdf = html2pdfModule.default;
+
+      // clone the measurement container for export
+      const source = measureRef.current;
+      const clone = source.cloneNode(true) as HTMLElement;
+      clone.style.position = "absolute";
+      clone.style.left = "-9999px";
+      clone.style.top = "0";
+      document.body.appendChild(clone);
+
+      const w = orientation === "portrait" ? dims.width : dims.height;
+      const h = orientation === "portrait" ? dims.height : dims.width;
+
+      await html2pdf()
+        .set({
+          margin: marginMm,
+          filename: `${title}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 3, useCORS: true, backgroundColor: bgColor },
+          jsPDF: { unit: "mm", format: [w, h], orientation },
+          pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+        })
+        .from(clone)
+        .save();
+
+      document.body.removeChild(clone);
+      toast("pdf exported");
+    } catch (err) {
+      console.error("pdf export failed", err);
+      toast("export failed");
+    } finally {
+      setExporting(false);
+    }
   }, [
+    exporting,
     title,
-    showTitle,
     pageSize,
     orientation,
     fontFamilyCSS,
@@ -412,6 +221,9 @@ export function ExportPageContent() {
     marginMm,
     darkMode,
     showPageNumbers,
+    showTitle,
+    dims,
+    bgColor,
   ]);
 
   if (!mounted) {
@@ -424,8 +236,74 @@ export function ExportPageContent() {
     );
   }
 
-  // preview scale so the page fits the panel
   const previewScale = 0.65;
+
+  // inline styles for the export content (applied to both measure container and page cards)
+  const exportContentStyles = `
+    .export-content, .export-content * { font-family: ${fontFamilyCSS}; color: ${fgColor}; }
+    .export-content .markdown-preview, .export-content .markdown-preview * { font-family: inherit !important; color: inherit !important; }
+    .export-content .markdown-preview h1 { font-size: 1.5em !important; font-weight: 700; margin: 1em 0 0.5em; padding-bottom: 0.25em; border-bottom: 1px solid ${borderColor}; }
+    .export-content .markdown-preview h2 { font-size: 1.3em !important; font-weight: 600; margin: 0.9em 0 0.4em; }
+    .export-content .markdown-preview h3 { font-size: 1.15em !important; font-weight: 600; margin: 0.8em 0 0.4em; }
+    .export-content .markdown-preview h4,
+    .export-content .markdown-preview h5,
+    .export-content .markdown-preview h6 { font-size: 1em !important; font-weight: 600; margin: 0.6em 0 0.3em; }
+    .export-content .markdown-preview p { margin: 0.4em 0; }
+    .export-content a { text-decoration: underline; text-underline-offset: 2px; }
+    .export-content blockquote { border-left: 3px solid ${borderColor}; padding-left: 1em; color: ${mutedColor} !important; margin: 0.75em 0; }
+    .export-content blockquote * { color: ${mutedColor} !important; }
+    .export-content pre {
+      background: ${codeBgColor} !important;
+      border: 1px solid ${borderColor};
+      padding: 0.75em;
+      overflow-x: auto;
+      margin: 0.75em 0;
+      font-size: 0.85em !important;
+      line-height: 1.5;
+    }
+    .export-content pre, .export-content pre *, .export-content code {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace !important;
+    }
+    .export-content pre code { font-size: inherit !important; background: none !important; padding: 0 !important; border: none !important; }
+    .export-content :not(pre) > code { background: ${codeBgColor} !important; padding: 0.15em 0.3em; border: 1px solid ${borderColor}; font-size: 0.9em !important; }
+    .export-content th { background: ${codeBgColor} !important; }
+    .export-content th, .export-content td { border-color: ${borderColor} !important; }
+    .export-content hr { border-color: ${borderColor} !important; }
+    .export-content .katex * { color: ${fgColor} !important; }
+    .export-content details { border: 1px solid ${borderColor}; margin: 0.75em 0; }
+    .export-content details summary { padding: 0.5em 0.75em; font-weight: 500; background: ${codeBgColor}; }
+    .export-content details[open] summary { border-bottom: 1px solid ${borderColor}; }
+    .export-content details > *:not(summary) { padding: 0 0.75em; }
+    .export-content img { max-width: 100%; }
+
+    /* syntax highlighting */
+    .export-content .hljs { background: ${codeBgColor} !important; color: ${hljs.base} !important; }
+    .export-content .hljs-keyword, .export-content .hljs-selector-tag, .export-content .hljs-literal, .export-content .hljs-tag { color: ${hljs.keyword} !important; }
+    .export-content .hljs-string, .export-content .hljs-addition, .export-content .hljs-link, .export-content .hljs-regexp { color: ${hljs.string} !important; }
+    .export-content .hljs-title, .export-content .hljs-section, .export-content .hljs-name { color: ${hljs.title} !important; }
+    .export-content .hljs-type, .export-content .hljs-built_in { color: ${hljs.type} !important; }
+    .export-content .hljs-number { color: ${hljs.number} !important; }
+    .export-content .hljs-comment, .export-content .hljs-quote, .export-content .hljs-meta { color: ${hljs.comment} !important; }
+    .export-content .hljs-variable, .export-content .hljs-template-variable, .export-content .hljs-selector-id, .export-content .hljs-selector-class { color: ${hljs.variable} !important; }
+    .export-content .hljs-attr, .export-content .hljs-attribute { color: ${hljs.type} !important; }
+    .export-content .hljs-symbol, .export-content .hljs-bullet { color: ${hljs.variable} !important; }
+    .export-content .hljs-deletion { color: ${hljs.keyword} !important; }
+  `;
+
+  const titleHtml = showTitle ? (
+    <h1
+      style={{
+        fontSize: `${fontSize * 1.5}px`,
+        fontWeight: 700,
+        marginBottom: `${fontSize}px`,
+        paddingBottom: `${fontSize * 0.5}px`,
+        borderBottom: `1px solid ${borderColor}`,
+        color: fgColor,
+      }}
+    >
+      {title}
+    </h1>
+  ) : null;
 
   return (
     <div className="h-dvh flex flex-col">
@@ -445,11 +323,11 @@ export function ExportPageContent() {
         <ThemeToggle />
         <button
           onClick={handleExport}
-          disabled={!content}
+          disabled={!content || exporting}
           className="ml-2 border border-border bg-foreground text-background px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-1.5"
         >
           <Download className="h-3 w-3" />
-          export pdf
+          {exporting ? "exporting..." : "download pdf"}
         </button>
       </div>
 
@@ -610,124 +488,110 @@ export function ExportPageContent() {
           >
             page numbers
           </Checkbox>
-
-          <div className="border border-border p-3 font-mono text-xs text-muted-foreground space-y-1">
-            <p>export opens your browser&apos;s print dialog.</p>
-            <p>select &quot;save as pdf&quot; as the destination for a pdf file.</p>
-          </div>
         </div>
 
-        {/* live preview */}
-        <div className="flex-1 overflow-auto bg-muted p-8 flex justify-center">
+        {/* live preview: paginated page cards */}
+        <div className="flex-1 overflow-auto bg-muted p-8">
+          {/* hidden measurement container - renders full content to measure height */}
+          <div
+            ref={measureRef}
+            className="export-content"
+            style={{
+              position: "absolute",
+              left: "-9999px",
+              top: 0,
+              width: `${pageWidthPx - 2 * marginPx}px`,
+              backgroundColor: bgColor,
+              color: fgColor,
+              fontFamily: fontFamilyCSS,
+              fontSize: `${fontSize}px`,
+              lineHeight: lineHeight,
+            }}
+          >
+            <style>{exportContentStyles}</style>
+            {titleHtml}
+            <div className="markdown-preview">
+              <MarkdownPreview content={content} />
+            </div>
+          </div>
+
+          {/* page cards */}
           <div
             style={{
               transform: `scale(${previewScale})`,
               transformOrigin: "top center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "24px",
+              paddingBottom: "48px",
             }}
           >
-            <div
-              ref={previewRef}
-              style={{
-                width: `${pageWidthPx}px`,
-                minHeight: `${pageHeightPx}px`,
-                padding: `${marginPx}px`,
-                backgroundColor: bgColor,
-                color: fgColor,
-                fontFamily: fontFamilyCSS,
-                fontSize: `${fontSize}px`,
-                lineHeight: lineHeight,
-                boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
-                backgroundImage: `repeating-linear-gradient(
-                  to bottom,
-                  transparent,
-                  transparent ${pageHeightPx - 1}px,
-                  ${darkMode ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.1)"} ${pageHeightPx - 1}px,
-                  ${darkMode ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.1)"} ${pageHeightPx}px
-                )`,
-                backgroundSize: `100% ${pageHeightPx}px`,
-              }}
-            >
-              {/* self-contained inline overrides for the preview panel */}
-              <style>{`
-                [data-export-preview] .markdown-preview,
-                [data-export-preview] .markdown-preview * {
-                  font-family: inherit !important;
-                  color: inherit !important;
-                }
-                [data-export-preview] .markdown-preview h1 { font-size: 1.5em !important; font-weight: 700; margin: 1em 0 0.5em; padding-bottom: 0.25em; border-bottom: 1px solid ${borderColor}; }
-                [data-export-preview] .markdown-preview h2 { font-size: 1.3em !important; font-weight: 600; margin: 0.9em 0 0.4em; }
-                [data-export-preview] .markdown-preview h3 { font-size: 1.15em !important; font-weight: 600; margin: 0.8em 0 0.4em; }
-                [data-export-preview] .markdown-preview h4,
-                [data-export-preview] .markdown-preview h5,
-                [data-export-preview] .markdown-preview h6 { font-size: 1em !important; font-weight: 600; margin: 0.6em 0 0.3em; }
-                [data-export-preview] .markdown-preview p { margin: 0.4em 0; }
-                [data-export-preview] a { text-decoration: underline; text-underline-offset: 2px; }
-                [data-export-preview] blockquote { border-left: 3px solid ${borderColor}; padding-left: 1em; color: ${mutedColor} !important; margin: 0.75em 0; }
-                [data-export-preview] blockquote * { color: ${mutedColor} !important; }
-                [data-export-preview] pre {
-                  background: ${codeBgColor} !important;
-                  border: 1px solid ${borderColor};
-                  padding: 0.75em;
-                  overflow-x: auto;
-                  margin: 0.75em 0;
-                  font-size: 0.85em !important;
-                  line-height: 1.5;
-                }
-                [data-export-preview] pre, [data-export-preview] pre *, [data-export-preview] code {
-                  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace !important;
-                }
-                [data-export-preview] pre code { font-size: inherit !important; background: none !important; padding: 0 !important; border: none !important; }
-                [data-export-preview] :not(pre) > code { background: ${codeBgColor} !important; padding: 0.15em 0.3em; border: 1px solid ${borderColor}; font-size: 0.9em !important; }
-                [data-export-preview] th { background: ${codeBgColor} !important; }
-                [data-export-preview] th, [data-export-preview] td { border-color: ${borderColor} !important; }
-                [data-export-preview] hr { border-color: ${borderColor} !important; }
-                [data-export-preview] .katex * { color: ${fgColor} !important; }
-                [data-export-preview] details { border: 1px solid ${borderColor}; margin: 0.75em 0; }
-                [data-export-preview] details summary { padding: 0.5em 0.75em; font-weight: 500; background: ${codeBgColor}; }
-                [data-export-preview] details[open] summary { border-bottom: 1px solid ${borderColor}; }
-                [data-export-preview] details > *:not(summary) { padding: 0 0.75em; }
-                [data-export-preview] img { max-width: 100%; }
-
-                /* syntax highlighting */
-                [data-export-preview] .hljs { background: ${codeBgColor} !important; color: ${hljs.base} !important; }
-                [data-export-preview] .hljs-keyword, [data-export-preview] .hljs-selector-tag, [data-export-preview] .hljs-literal, [data-export-preview] .hljs-tag { color: ${hljs.keyword} !important; }
-                [data-export-preview] .hljs-string, [data-export-preview] .hljs-addition, [data-export-preview] .hljs-link, [data-export-preview] .hljs-regexp { color: ${hljs.string} !important; }
-                [data-export-preview] .hljs-title, [data-export-preview] .hljs-section, [data-export-preview] .hljs-name { color: ${hljs.title} !important; }
-                [data-export-preview] .hljs-type, [data-export-preview] .hljs-built_in { color: ${hljs.type} !important; }
-                [data-export-preview] .hljs-number { color: ${hljs.number} !important; }
-                [data-export-preview] .hljs-comment, [data-export-preview] .hljs-quote, [data-export-preview] .hljs-meta { color: ${hljs.comment} !important; }
-                [data-export-preview] .hljs-variable, [data-export-preview] .hljs-template-variable, [data-export-preview] .hljs-selector-id, [data-export-preview] .hljs-selector-class { color: ${hljs.variable} !important; }
-                [data-export-preview] .hljs-attr, [data-export-preview] .hljs-attribute { color: ${hljs.type} !important; }
-                [data-export-preview] .hljs-symbol, [data-export-preview] .hljs-bullet { color: ${hljs.variable} !important; }
-                [data-export-preview] .hljs-deletion { color: ${hljs.keyword} !important; }
-              `}</style>
-
-              <div data-export-preview>
-                {showTitle && (
-                  <h1
+            <style>{exportContentStyles}</style>
+            {Array.from({ length: pageCount }, (_, i) => (
+              <div key={i} style={{ position: "relative" }}>
+                {/* page card */}
+                <div
+                  style={{
+                    width: `${pageWidthPx}px`,
+                    height: `${pageHeightPx}px`,
+                    backgroundColor: bgColor,
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+                    padding: `${marginPx}px`,
+                    overflow: "hidden",
+                    position: "relative",
+                  }}
+                >
+                  <div
+                    className="export-content"
                     style={{
-                      fontSize: `${fontSize * 1.5}px`,
-                      fontWeight: 700,
-                      marginBottom: `${fontSize}px`,
-                      paddingBottom: `${fontSize * 0.5}px`,
-                      borderBottom: `1px solid ${borderColor}`,
+                      height: `${contentAreaHeight}px`,
+                      overflow: "hidden",
+                      position: "relative",
+                      fontFamily: fontFamilyCSS,
+                      fontSize: `${fontSize}px`,
+                      lineHeight: lineHeight,
                       color: fgColor,
                     }}
                   >
-                    {title}
-                  </h1>
-                )}
-                <div className="markdown-preview">
-                  <MarkdownPreview content={content} />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: `${-i * contentAreaHeight}px`,
+                        left: 0,
+                        right: 0,
+                      }}
+                    >
+                      {titleHtml}
+                      <div className="markdown-preview">
+                        <MarkdownPreview content={content} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* page number */}
+                  {showPageNumbers && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: `${marginPx * 0.4}px`,
+                        left: 0,
+                        right: 0,
+                        textAlign: "center",
+                        fontSize: "8px",
+                        color: mutedColor,
+                        fontFamily: fontFamilyCSS,
+                      }}
+                    >
+                      {i + 1} / {pageCount}
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
-
-      {/* hidden iframe for potential future use */}
-      <iframe ref={iframeRef} className="hidden" title="print" />
     </div>
   );
 }
