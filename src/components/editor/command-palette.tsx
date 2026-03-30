@@ -2,7 +2,7 @@
 
 import { Command } from "cmdk";
 import { useEffect, useState } from "react";
-import type { Editor } from "@tiptap/react";
+import type { MarkdownCodeEditorHandle } from "./markdown-code-editor";
 import {
   Bold,
   Italic,
@@ -19,8 +19,6 @@ import {
   CheckSquare,
   Table,
   CodeSquare,
-  Undo2,
-  Redo2,
   FileDown,
   Sigma,
   Upload,
@@ -47,7 +45,7 @@ type CommandItem = {
 type CommandPaletteProps = {
   open: boolean;
   onClose: () => void;
-  editor: Editor | null;
+  codeEditorRef?: React.RefObject<MarkdownCodeEditorHandle | null>;
   onExportPdf: () => void;
   onOpenMath: () => void;
   onImport: () => void;
@@ -55,12 +53,14 @@ type CommandPaletteProps = {
   onTogglePreview: () => void;
   onPublish: () => void;
   onOpenSettings: () => void;
+  // keep for backwards compat but unused
+  editor?: unknown;
 };
 
 export function CommandPalette({
   open,
   onClose,
-  editor,
+  codeEditorRef,
   onExportPdf,
   onOpenMath,
   onImport,
@@ -78,6 +78,8 @@ export function CommandPalette({
 
   if (!open) return null;
 
+  const h = codeEditorRef?.current;
+
   const items: CommandItem[] = [
     // formatting
     {
@@ -85,7 +87,7 @@ export function CommandPalette({
       label: "bold",
       icon: Bold,
       keywords: "strong",
-      action: () => editor?.chain().focus().toggleBold().run(),
+      action: () => h?.wrapSelection("**", "**"),
       group: "formatting",
     },
     {
@@ -93,7 +95,7 @@ export function CommandPalette({
       label: "italic",
       icon: Italic,
       keywords: "emphasis",
-      action: () => editor?.chain().focus().toggleItalic().run(),
+      action: () => h?.wrapSelection("*", "*"),
       group: "formatting",
     },
     {
@@ -101,7 +103,7 @@ export function CommandPalette({
       label: "strikethrough",
       icon: Strikethrough,
       keywords: "strike delete",
-      action: () => editor?.chain().focus().toggleStrike().run(),
+      action: () => h?.wrapSelection("~~", "~~"),
       group: "formatting",
     },
     {
@@ -109,7 +111,7 @@ export function CommandPalette({
       label: "inline code",
       icon: Code,
       keywords: "monospace",
-      action: () => editor?.chain().focus().toggleCode().run(),
+      action: () => h?.wrapSelection("`", "`"),
       group: "formatting",
     },
     // blocks
@@ -118,7 +120,7 @@ export function CommandPalette({
       label: "heading 1",
       icon: Heading1,
       keywords: "h1 title",
-      action: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
+      action: () => h?.insertLine("# "),
       group: "blocks",
     },
     {
@@ -126,7 +128,7 @@ export function CommandPalette({
       label: "heading 2",
       icon: Heading2,
       keywords: "h2",
-      action: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
+      action: () => h?.insertLine("## "),
       group: "blocks",
     },
     {
@@ -134,7 +136,7 @@ export function CommandPalette({
       label: "heading 3",
       icon: Heading3,
       keywords: "h3",
-      action: () => editor?.chain().focus().toggleHeading({ level: 3 }).run(),
+      action: () => h?.insertLine("### "),
       group: "blocks",
     },
     {
@@ -142,7 +144,7 @@ export function CommandPalette({
       label: "bullet list",
       icon: List,
       keywords: "unordered ul",
-      action: () => editor?.chain().focus().toggleBulletList().run(),
+      action: () => h?.insertLine("- "),
       group: "blocks",
     },
     {
@@ -150,7 +152,7 @@ export function CommandPalette({
       label: "ordered list",
       icon: ListOrdered,
       keywords: "numbered ol",
-      action: () => editor?.chain().focus().toggleOrderedList().run(),
+      action: () => h?.insertLine("1. "),
       group: "blocks",
     },
     {
@@ -158,7 +160,7 @@ export function CommandPalette({
       label: "task list",
       icon: CheckSquare,
       keywords: "todo checkbox",
-      action: () => editor?.chain().focus().toggleTaskList().run(),
+      action: () => h?.insertLine("- [ ] "),
       group: "blocks",
     },
     {
@@ -166,7 +168,7 @@ export function CommandPalette({
       label: "blockquote",
       icon: Quote,
       keywords: "quote",
-      action: () => editor?.chain().focus().toggleBlockquote().run(),
+      action: () => h?.insertLine("> "),
       group: "blocks",
     },
     {
@@ -174,7 +176,7 @@ export function CommandPalette({
       label: "code block",
       icon: CodeSquare,
       keywords: "fence pre",
-      action: () => editor?.chain().focus().toggleCodeBlock().run(),
+      action: () => h?.insertSyntax("\n```\n", "\n```\n"),
       group: "blocks",
     },
     {
@@ -182,7 +184,7 @@ export function CommandPalette({
       label: "horizontal rule",
       icon: Minus,
       keywords: "hr divider line",
-      action: () => editor?.chain().focus().setHorizontalRule().run(),
+      action: () => h?.insertSyntax("\n---\n"),
       group: "blocks",
     },
     {
@@ -192,7 +194,7 @@ export function CommandPalette({
       keywords: "url href",
       action: () => {
         const url = window.prompt("url:");
-        if (url) editor?.chain().focus().setLink({ href: url }).run();
+        if (url) h?.wrapSelection("[", `](${url})`);
       },
       group: "blocks",
     },
@@ -202,11 +204,9 @@ export function CommandPalette({
       icon: Table,
       keywords: "grid",
       action: () =>
-        editor
-          ?.chain()
-          .focus()
-          .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-          .run(),
+        h?.insertSyntax(
+          "\n| Header | Header | Header |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n"
+        ),
       group: "blocks",
     },
     {
@@ -218,22 +218,6 @@ export function CommandPalette({
       group: "blocks",
     },
     // edit
-    {
-      id: "undo",
-      label: "undo",
-      icon: Undo2,
-      keywords: "back",
-      action: () => editor?.chain().focus().undo().run(),
-      group: "edit",
-    },
-    {
-      id: "redo",
-      label: "redo",
-      icon: Redo2,
-      keywords: "forward",
-      action: () => editor?.chain().focus().redo().run(),
-      group: "edit",
-    },
     {
       id: "copy",
       label: "copy",
@@ -300,7 +284,7 @@ export function CommandPalette({
       id: "settings",
       label: "settings",
       icon: Settings,
-      keywords: "config preferences scale",
+      keywords: "config preferences scale font",
       action: onOpenSettings,
       group: "actions",
     },
@@ -318,10 +302,12 @@ export function CommandPalette({
     const item = items.find((i) => i.id === id);
     if (item) {
       onClose();
-      // slight delay so dialog closes first
       requestAnimationFrame(() => item.action());
     }
   };
+
+  const groupHeadingClass =
+    "[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:font-semibold";
 
   return (
     <div
@@ -350,81 +336,23 @@ export function CommandPalette({
               no results
             </Command.Empty>
 
-            <Command.Group
-              heading="formatting"
-              className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:font-semibold"
-            >
-              {items
-                .filter((i) => i.group === "formatting")
-                .map((item) => (
-                  <Command.Item
-                    key={item.id}
-                    value={`${item.label} ${item.keywords || ""}`}
-                    onSelect={() => handleSelect(item.id)}
-                    className="flex items-center gap-2 px-2 py-1.5 font-mono text-xs cursor-pointer data-[selected=true]:bg-accent transition-colors"
-                  >
-                    <item.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                    {item.label}
-                  </Command.Item>
-                ))}
-            </Command.Group>
-
-            <Command.Group
-              heading="blocks"
-              className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:font-semibold"
-            >
-              {items
-                .filter((i) => i.group === "blocks")
-                .map((item) => (
-                  <Command.Item
-                    key={item.id}
-                    value={`${item.label} ${item.keywords || ""}`}
-                    onSelect={() => handleSelect(item.id)}
-                    className="flex items-center gap-2 px-2 py-1.5 font-mono text-xs cursor-pointer data-[selected=true]:bg-accent transition-colors"
-                  >
-                    <item.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                    {item.label}
-                  </Command.Item>
-                ))}
-            </Command.Group>
-
-            <Command.Group
-              heading="edit"
-              className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:font-semibold"
-            >
-              {items
-                .filter((i) => i.group === "edit")
-                .map((item) => (
-                  <Command.Item
-                    key={item.id}
-                    value={`${item.label} ${item.keywords || ""}`}
-                    onSelect={() => handleSelect(item.id)}
-                    className="flex items-center gap-2 px-2 py-1.5 font-mono text-xs cursor-pointer data-[selected=true]:bg-accent transition-colors"
-                  >
-                    <item.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                    {item.label}
-                  </Command.Item>
-                ))}
-            </Command.Group>
-
-            <Command.Group
-              heading="actions"
-              className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:font-semibold"
-            >
-              {items
-                .filter((i) => i.group === "actions")
-                .map((item) => (
-                  <Command.Item
-                    key={item.id}
-                    value={`${item.label} ${item.keywords || ""}`}
-                    onSelect={() => handleSelect(item.id)}
-                    className="flex items-center gap-2 px-2 py-1.5 font-mono text-xs cursor-pointer data-[selected=true]:bg-accent transition-colors"
-                  >
-                    <item.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                    {item.label}
-                  </Command.Item>
-                ))}
-            </Command.Group>
+            {["formatting", "blocks", "edit", "actions"].map((group) => (
+              <Command.Group key={group} heading={group} className={groupHeadingClass}>
+                {items
+                  .filter((i) => i.group === group)
+                  .map((item) => (
+                    <Command.Item
+                      key={item.id}
+                      value={`${item.label} ${item.keywords || ""}`}
+                      onSelect={() => handleSelect(item.id)}
+                      className="flex items-center gap-2 px-2 py-1.5 font-mono text-xs cursor-pointer data-[selected=true]:bg-accent transition-colors"
+                    >
+                      <item.icon className="h-3.5 w-3.5 text-muted-foreground" />
+                      {item.label}
+                    </Command.Item>
+                  ))}
+              </Command.Group>
+            ))}
           </Command.List>
 
           <div className="border-t border-border px-3 py-1.5 font-mono text-xs text-muted-foreground flex gap-3">

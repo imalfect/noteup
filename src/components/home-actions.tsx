@@ -1,10 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { FileText, Upload, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Dialog } from "@base-ui/react/dialog";
+
+const DRAFT_KEY = "noteup-draft";
 
 export function HomeActions() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -13,6 +15,33 @@ export function HomeActions() {
   const [editSlug, setEditSlug] = useState("");
   const [editKey, setEditKey] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+
+  const handleNewNote = () => {
+    // check if there's existing draft content
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        if (draft.content && draft.content.trim().length > 0) {
+          setShowDraftPrompt(true);
+          return;
+        }
+      }
+    } catch {}
+    router.push("/draft");
+  };
+
+  const handleContinueDraft = () => {
+    setShowDraftPrompt(false);
+    router.push("/draft");
+  };
+
+  const handleNewClean = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setShowDraftPrompt(false);
+    router.push("/draft");
+  };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -22,7 +51,7 @@ export function HomeActions() {
     reader.onload = (event) => {
       const content = event.target?.result as string;
       localStorage.setItem(
-        "noteup-draft",
+        DRAFT_KEY,
         JSON.stringify({
           content,
           title: file.name.replace(/\.md$/, ""),
@@ -51,7 +80,6 @@ export function HomeActions() {
         toast(data.error || "verification failed");
         return;
       }
-      // navigate to editor in edit mode
       router.push(
         `/draft?edit=${encodeURIComponent(editSlug)}&key=${encodeURIComponent(editKey)}`
       );
@@ -65,13 +93,13 @@ export function HomeActions() {
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
-        <Link
-          href="/draft"
+        <button
+          onClick={handleNewNote}
           className="flex-1 border border-border p-3 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center gap-2"
         >
           <FileText className="h-3 w-3 text-muted-foreground" />
           new note
-        </Link>
+        </button>
         <button
           onClick={() => fileInputRef.current?.click()}
           className="flex-1 border border-border p-3 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center gap-2"
@@ -125,6 +153,39 @@ export function HomeActions() {
           </button>
         </div>
       )}
+
+      {/* draft exists prompt */}
+      <Dialog.Root open={showDraftPrompt} onOpenChange={(o) => !o && setShowDraftPrompt(false)}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 bg-black/60 z-50" />
+          <Dialog.Popup className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100%-2rem)] max-w-sm bg-card border border-border">
+            <div className="p-4 border-b border-border">
+              <Dialog.Title className="font-mono text-xs font-semibold uppercase tracking-wider">
+                existing draft found
+              </Dialog.Title>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="font-mono text-xs text-muted-foreground">
+                you have an unsaved draft. would you like to continue editing it or start fresh?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleContinueDraft}
+                  className="flex-1 border border-border bg-foreground text-background p-2.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors"
+                >
+                  continue draft
+                </button>
+                <button
+                  onClick={handleNewClean}
+                  className="flex-1 border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors"
+                >
+                  start fresh
+                </button>
+              </div>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

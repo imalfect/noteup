@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { Editor } from "@tiptap/react";
 import { Title } from "@/components/title";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { TiptapEditor } from "@/components/editor/tiptap-editor";
 import { Toolbar } from "@/components/editor/toolbar";
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { PublishDialog } from "@/components/editor/publish-dialog";
@@ -14,6 +12,7 @@ import { CommandPalette } from "@/components/editor/command-palette";
 import { EditorContextMenu } from "@/components/editor/context-menu";
 import { SettingsDialog } from "@/components/editor/settings-dialog";
 import { VersionHistoryDialog } from "@/components/editor/version-history-dialog";
+import { MarkdownCodeEditor, type MarkdownCodeEditorHandle } from "@/components/editor/markdown-code-editor";
 import { encryptContent } from "@/lib/crypto";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
@@ -27,12 +26,16 @@ import {
   Settings,
   Command,
   History,
+  FilePlus,
 } from "lucide-react";
 import Link from "next/link";
+import { Tooltip } from "@/components/ui/tooltip";
+import { Dialog } from "@base-ui/react/dialog";
 
 const DRAFT_KEY = "noteup-draft";
 const AUTOSAVE_INTERVAL = 3000;
 const UI_SCALE_KEY = "noteup-ui-scale";
+const EDITOR_FONT_KEY = "noteup-editor-font";
 
 type Draft = {
   content: string;
@@ -63,6 +66,14 @@ function loadUiScale(): number {
   return 1;
 }
 
+function loadEditorFont(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem(EDITOR_FONT_KEY) || "";
+  } catch {}
+  return "";
+}
+
 export function DraftEditor() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -80,19 +91,26 @@ export function DraftEditor() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [editor, setEditor] = useState<Editor | null>(null);
   const [uiScale, setUiScale] = useState(1);
+  const [editorFont, setEditorFont] = useState("");
   const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+  const [justPublished, setJustPublished] = useState<{
+    url: string;
+    editKey: string;
+    slug: string;
+  } | null>(null);
+  const [showNewNoteConfirm, setShowNewNoteConfirm] = useState(false);
   const lastSaveRef = useRef<number>(Date.now());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const codeEditorRef = useRef<MarkdownCodeEditorHandle>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     setUiScale(loadUiScale());
+    setEditorFont(loadEditorFont());
 
     if (isEditMode) {
-      // load note from server via edit/verify
       fetch("/api/edit/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -121,6 +139,11 @@ export function DraftEditor() {
   const handleUiScaleChange = (scale: number) => {
     setUiScale(scale);
     localStorage.setItem(UI_SCALE_KEY, String(scale));
+  };
+
+  const handleEditorFontChange = (font: string) => {
+    setEditorFont(font);
+    localStorage.setItem(EDITOR_FONT_KEY, font);
   };
 
   // autosave (only for new notes, not edit mode)
@@ -166,10 +189,6 @@ export function DraftEditor() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [content, title, isEditMode]);
 
-  const handleEditorReady = useCallback((ed: Editor) => {
-    setEditor(ed);
-  }, []);
-
   const handlePublish = async (
     slug: string,
     password: string
@@ -213,10 +232,11 @@ export function DraftEditor() {
 
     localStorage.removeItem(DRAFT_KEY);
     const origin = window.location.origin;
+    setJustPublished({ url: `${origin}/${slug}`, editKey, slug });
     return { url: `${origin}/${slug}`, editKey };
   };
 
-  const handleSaveEdit = async (): Promise<boolean> => {
+  const handleSaveEdit = async (password?: string): Promise<boolean> => {
     if (!editSlug || !editKeyParam) return false;
 
     let finalContent = content;
@@ -224,8 +244,13 @@ export function DraftEditor() {
     let iv: string | null = null;
     let encrypted = false;
 
-    // note: if user wants to re-encrypt, they'd need the password
-    // for simplicity, we save as-is (the dialog has a password field for re-encryption)
+    if (password) {
+      const enc = await encryptContent(content, password);
+      finalContent = enc.encrypted;
+      salt = enc.salt;
+      iv = enc.iv;
+      encrypted = true;
+    }
 
     const res = await fetch("/api/edit/save", {
       method: "POST",
@@ -276,9 +301,10 @@ export function DraftEditor() {
   };
 
   const handleInsertMath = (latex: string, isBlock: boolean) => {
-    if (!editor) return;
+    const handle = codeEditorRef.current;
+    if (!handle) return;
     const insert = isBlock ? `\n$$\n${latex}\n$$\n` : `$${latex}$`;
-    editor.chain().focus().insertContent(insert).run();
+    handle.insertSyntax(insert);
     setShowMathDialog(false);
   };
 
@@ -288,11 +314,36 @@ export function DraftEditor() {
     toast("draft saved");
   };
 
+  const handleExportPdf = () => {
+    sessionStorage.setItem(
+      "noteup-export",
+      JSON.stringify({ content, title })
+    );
+    router.push("/export?draft=true");
+  };
+
   const handleLoadVersion = (versionContent: string, versionTitle: string) => {
     setContent(versionContent);
     setTitle(versionTitle);
     setShowVersionHistory(false);
     toast("version loaded into editor");
+  };
+
+  const handleNewNote = () => {
+    if (content.trim().length > 0) {
+      setShowNewNoteConfirm(true);
+    } else {
+      doNewNote();
+    }
+  };
+
+  const doNewNote = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setContent("");
+    setTitle("untitled");
+    setShowNewNoteConfirm(false);
+    setJustPublished(null);
+    toast("new note");
   };
 
   if (!mounted) {
@@ -307,8 +358,12 @@ export function DraftEditor() {
 
   return (
     <div
-      className="h-dvh flex flex-col"
-      style={{ fontSize: `${uiScale * 100}%` }}
+      className="flex flex-col origin-top-left"
+      style={{
+        transform: `scale(${uiScale})`,
+        width: `${100 / uiScale}%`,
+        height: `${100 / uiScale}dvh`,
+      }}
     >
       {/* header */}
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
@@ -342,41 +397,56 @@ export function DraftEditor() {
         />
 
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => setShowCommandPalette(true)}
-            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-            title="command palette (ctrl+k)"
-          >
-            <Command className="h-3.5 w-3.5" />
-          </button>
+          {!isEditMode && (
+            <Tooltip content="new note">
+              <button
+                onClick={handleNewNote}
+                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <FilePlus className="h-3.5 w-3.5" />
+              </button>
+            </Tooltip>
+          )}
 
-          <button
-            onClick={() => setShowMathDialog(true)}
-            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-            title="math formula editor"
-          >
-            <Sigma className="h-3.5 w-3.5" />
-          </button>
+          <Tooltip content="command palette (ctrl+k)">
+            <button
+              onClick={() => setShowCommandPalette(true)}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Command className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
+
+          <Tooltip content="math formula">
+            <button
+              onClick={() => setShowMathDialog(true)}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Sigma className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
 
           {isEditMode && (
-            <button
-              onClick={() => setShowVersionHistory(true)}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-              title="version history"
-            >
-              <History className="h-3.5 w-3.5" />
-            </button>
+            <Tooltip content="version history">
+              <button
+                onClick={() => setShowVersionHistory(true)}
+                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <History className="h-3.5 w-3.5" />
+              </button>
+            </Tooltip>
           )}
 
           {!isEditMode && (
             <>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                title="import markdown"
-              >
-                <Upload className="h-3.5 w-3.5" />
-              </button>
+              <Tooltip content="import markdown">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                </button>
+              </Tooltip>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -385,53 +455,67 @@ export function DraftEditor() {
                 className="hidden"
               />
 
-              <button
-                onClick={doSaveDraft}
-                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                title="save draft (ctrl+s)"
-              >
-                <Save className="h-3.5 w-3.5" />
-              </button>
+              <Tooltip content="save draft (ctrl+s)">
+                <button
+                  onClick={doSaveDraft}
+                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                </button>
+              </Tooltip>
             </>
           )}
 
-          <button
-            onClick={() => setShowPreview(!showPreview)}
-            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-            title={
-              showPreview ? "hide markdown preview" : "show markdown preview"
-            }
-          >
-            {showPreview ? (
-              <EyeOff className="h-3.5 w-3.5" />
-            ) : (
-              <Eye className="h-3.5 w-3.5" />
-            )}
-          </button>
+          <Tooltip content={showPreview ? "hide preview" : "show preview"}>
+            <button
+              onClick={() => setShowPreview(!showPreview)}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showPreview ? (
+                <EyeOff className="h-3.5 w-3.5" />
+              ) : (
+                <Eye className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </Tooltip>
 
-          <button
-            onClick={() => setShowSettings(true)}
-            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-            title="settings"
-          >
-            <Settings className="h-3.5 w-3.5" />
-          </button>
+          <Tooltip content="settings">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
 
           <ThemeToggle />
 
-          <button
-            onClick={() => setShowPublish(true)}
-            className="ml-2 border border-border bg-foreground text-background px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors"
-          >
-            {isEditMode ? "save changes" : "publish"}
-          </button>
+          {justPublished && !isEditMode ? (
+            <Tooltip content="edit the published note">
+              <button
+                onClick={() => {
+                  router.push(`/draft?edit=${justPublished.slug}&key=${justPublished.editKey}`);
+                }}
+                className="ml-2 border border-border bg-foreground text-background px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors"
+              >
+                edit published
+              </button>
+            </Tooltip>
+          ) : (
+            <button
+              onClick={() => setShowPublish(true)}
+              className="ml-2 border border-border bg-foreground text-background px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors"
+            >
+              {isEditMode ? "save changes" : "publish"}
+            </button>
+          )}
         </div>
       </div>
 
       {/* toolbar */}
       <Toolbar
-        editor={editor}
-        onExportPdf={() => router.push(`/export?draft=true`)}
+        codeEditorRef={codeEditorRef}
+        onExportPdf={handleExportPdf}
       />
 
       {/* editor + optional markdown preview */}
@@ -439,15 +523,19 @@ export function DraftEditor() {
         <div
           className={`${showPreview ? "w-1/2 border-r border-border" : "w-full"} flex flex-col overflow-hidden`}
         >
-          <TiptapEditor
+          <MarkdownCodeEditor
+            ref={codeEditorRef}
             content={content}
             onChange={setContent}
-            onEditorReady={handleEditorReady}
           />
         </div>
-
         {showPreview && (
-          <div className="w-1/2 overflow-auto p-4">
+          <div
+            className="w-1/2 overflow-auto p-4"
+            style={{
+              fontFamily: editorFont || "var(--font-mono), 'Fira Code', 'SF Mono', ui-monospace, monospace",
+            }}
+          >
             <MarkdownPreview content={content} />
           </div>
         )}
@@ -461,18 +549,18 @@ export function DraftEditor() {
         <span className="flex-1" />
         {isEditMode && currentVersion && <span>v{currentVersion}</span>}
         <span>ctrl+k command palette</span>
-        <span>{isEditMode ? `editing · ${editSlug}` : "draft · auto-saved"}</span>
+        <span>{isEditMode ? `editing · ${editSlug}` : justPublished ? `published · ${justPublished.slug}` : "draft · auto-saved"}</span>
       </div>
 
       {/* context menu */}
-      <EditorContextMenu editor={editor} />
+      <EditorContextMenu codeEditorRef={codeEditorRef} />
 
       {/* command palette */}
       <CommandPalette
         open={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
-        editor={editor}
-        onExportPdf={() => router.push(`/export?draft=true`)}
+        codeEditorRef={codeEditorRef}
+        onExportPdf={handleExportPdf}
         onOpenMath={() => setShowMathDialog(true)}
         onImport={() => !isEditMode && fileInputRef.current?.click()}
         onSaveDraft={doSaveDraft}
@@ -487,6 +575,8 @@ export function DraftEditor() {
         onClose={() => setShowSettings(false)}
         uiScale={uiScale}
         onUiScaleChange={handleUiScaleChange}
+        editorFont={editorFont}
+        onEditorFontChange={handleEditorFontChange}
       />
 
       {/* publish / save dialog */}
@@ -516,6 +606,39 @@ export function DraftEditor() {
           onLoadVersion={handleLoadVersion}
         />
       )}
+
+      {/* new note confirmation */}
+      <Dialog.Root open={showNewNoteConfirm} onOpenChange={(o) => !o && setShowNewNoteConfirm(false)}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 bg-black/60 z-50" />
+          <Dialog.Popup className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100%-2rem)] max-w-sm bg-card border border-border">
+            <div className="p-4 border-b border-border">
+              <Dialog.Title className="font-mono text-xs font-semibold uppercase tracking-wider">
+                start new note?
+              </Dialog.Title>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="font-mono text-xs text-muted-foreground">
+                you have unsaved content. starting a new note will clear the current draft.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowNewNoteConfirm(false)}
+                  className="flex-1 border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors"
+                >
+                  cancel
+                </button>
+                <button
+                  onClick={doNewNote}
+                  className="flex-1 border border-border bg-foreground text-background p-2.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors"
+                >
+                  start fresh
+                </button>
+              </div>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

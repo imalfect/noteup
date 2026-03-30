@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
+@import "highlight.js/styles/github.min.css";
 
 :root {
   --radius: 0px;
@@ -97,7 +98,7 @@ body {
 
 /* tiptap editor styles */
 .tiptap-editor {
-  font-family: var(--font-mono);
+  font-family: inherit;
   font-size: 13px;
   line-height: 1.7;
   color: var(--foreground);
@@ -117,6 +118,44 @@ body {
   color: var(--muted-foreground);
   pointer-events: none;
   height: 0;
+}
+
+/* markdown decoration: show syntax markers on focused blocks */
+.tiptap-editor h1.has-focus::before,
+.tiptap-editor h2.has-focus::before,
+.tiptap-editor h3.has-focus::before,
+.tiptap-editor h4.has-focus::before,
+.tiptap-editor h5.has-focus::before,
+.tiptap-editor h6.has-focus::before {
+  color: var(--muted-foreground);
+  font-weight: 400;
+  font-size: 0.75em;
+  opacity: 0.6;
+  margin-right: 0.35em;
+}
+
+.tiptap-editor h1.has-focus::before { content: "#"; }
+.tiptap-editor h2.has-focus::before { content: "##"; }
+.tiptap-editor h3.has-focus::before { content: "###"; }
+.tiptap-editor h4.has-focus::before { content: "####"; }
+.tiptap-editor h5.has-focus::before { content: "#####"; }
+.tiptap-editor h6.has-focus::before { content: "######"; }
+
+.tiptap-editor blockquote.has-focus::before {
+  content: ">";
+  color: var(--muted-foreground);
+  font-weight: 400;
+  font-size: 0.75em;
+  opacity: 0.6;
+  margin-right: 0.35em;
+}
+
+.tiptap-editor hr.has-focus::before {
+  content: "---";
+  color: var(--muted-foreground);
+  font-weight: 400;
+  font-size: 0.75em;
+  opacity: 0.6;
 }
 
 .tiptap-editor h1 {
@@ -285,7 +324,7 @@ body {
 
 /* markdown preview styles */
 .markdown-preview {
-  font-family: var(--font-mono);
+  font-family: inherit;
   font-size: 13px;
   line-height: 1.7;
   color: var(--foreground);
@@ -345,12 +384,21 @@ body {
   padding: 0.75rem;
   overflow-x: auto;
   margin: 0.75rem 0;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.markdown-preview pre code {
+  font-family: var(--font-mono);
+  font-size: inherit;
+  background: none;
+  padding: 0;
+  border: none;
 }
 
 .markdown-preview code {
   font-family: var(--font-mono);
-  font-size: 0.85em;
+  font-size: 0.9em;
 }
 
 .markdown-preview :not(pre) > code {
@@ -420,12 +468,73 @@ body {
   overflow-x: auto;
 }
 
-/* highlight.js theme override for dark */
-.dark .hljs {
-  background: var(--card) !important;
-  color: var(--foreground) !important;
-}
-
+/* highlight.js overrides */
 .hljs {
   background: var(--card) !important;
+}
+
+.dark .hljs {
+  background: var(--card) !important;
+  color: #c9d1d9 !important;
+}
+
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-literal { color: #ff7b72 !important; }
+.dark .hljs-string,
+.dark .hljs-addition { color: #a5d6ff !important; }
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-name { color: #d2a8ff !important; }
+.dark .hljs-type,
+.dark .hljs-built_in { color: #79c0ff !important; }
+.dark .hljs-number { color: #79c0ff !important; }
+.dark .hljs-comment,
+.dark .hljs-quote,
+.dark .hljs-meta { color: #8b949e !important; }
+.dark .hljs-variable,
+.dark .hljs-template-variable { color: #ffa657 !important; }
+.dark .hljs-attr { color: #79c0ff !important; }
+.dark .hljs-regexp { color: #a5d6ff !important; }
+.dark .hljs-symbol,
+.dark .hljs-bullet { color: #f2cc60 !important; }
+.dark .hljs-deletion { color: #ffa198 !important; }
+
+/* details/summary collapsible */
+.markdown-preview details {
+  border: 1px solid var(--border);
+  margin: 0.75rem 0;
+}
+
+.markdown-preview details summary {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-weight: 500;
+  user-select: none;
+  background: var(--muted);
+}
+
+.markdown-preview details summary:hover {
+  background: var(--accent);
+}
+
+.markdown-preview details[open] summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.markdown-preview details > *:not(summary) {
+  padding: 0 0.75rem;
+}
+
+.markdown-preview details > p:first-of-type {
+  margin-top: 0.5rem;
+}
+
+.markdown-preview details > *:last-child {
+  margin-bottom: 0.75rem;
+}
+
+/* images */
+.markdown-preview img {
+  max-width: 100%;
 }

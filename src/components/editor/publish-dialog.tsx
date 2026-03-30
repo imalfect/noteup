@@ -17,7 +17,7 @@ type PublishDialogProps = {
   onPublish: (slug: string, password: string) => Promise<PublishResult>;
   defaultSlug: string;
   isEditMode?: boolean;
-  onSaveEdit?: () => Promise<boolean>;
+  onSaveEdit?: (password?: string) => Promise<boolean>;
 };
 
 export function PublishDialog({
@@ -98,7 +98,7 @@ export function PublishDialog({
     if (!onSaveEdit) return;
     setPublishing(true);
     try {
-      const ok = await onSaveEdit();
+      const ok = await onSaveEdit(password || undefined);
       if (ok) {
         setEditSaved(true);
         toast("changes saved");
