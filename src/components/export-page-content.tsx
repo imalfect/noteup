@@ -310,6 +310,17 @@ export function ExportPageContent() {
 
   useEffect(() => {
     setMounted(true);
+    // always prefer sessionStorage (set by the editor right before navigating)
+    // fall back to localStorage draft
+    try {
+      const fromSession = sessionStorage.getItem("noteup-export");
+      if (fromSession) {
+        const data = JSON.parse(fromSession);
+        setContent(data.content || "");
+        setTitle(data.title || "untitled");
+        return;
+      }
+    } catch {}
     if (isDraft) {
       try {
         const saved = localStorage.getItem(DRAFT_KEY);
@@ -317,15 +328,6 @@ export function ExportPageContent() {
           const draft = JSON.parse(saved);
           setContent(draft.content || "");
           setTitle(draft.title || "untitled");
-        }
-      } catch {}
-    } else {
-      try {
-        const saved = sessionStorage.getItem("noteup-export");
-        if (saved) {
-          const data = JSON.parse(saved);
-          setContent(data.content || "");
-          setTitle(data.title || "untitled");
         }
       } catch {}
     }

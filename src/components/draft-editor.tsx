@@ -314,6 +314,14 @@ export function DraftEditor() {
     toast("draft saved");
   };
 
+  const handleExportPdf = () => {
+    sessionStorage.setItem(
+      "noteup-export",
+      JSON.stringify({ content, title })
+    );
+    router.push("/export?draft=true");
+  };
+
   const handleLoadVersion = (versionContent: string, versionTitle: string) => {
     setContent(versionContent);
     setTitle(versionTitle);
@@ -507,7 +515,7 @@ export function DraftEditor() {
       {/* toolbar */}
       <Toolbar
         codeEditorRef={codeEditorRef}
-        onExportPdf={() => router.push(`/export?draft=true`)}
+        onExportPdf={handleExportPdf}
       />
 
       {/* editor + optional markdown preview */}
@@ -552,7 +560,7 @@ export function DraftEditor() {
         open={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
         codeEditorRef={codeEditorRef}
-        onExportPdf={() => router.push(`/export?draft=true`)}
+        onExportPdf={handleExportPdf}
         onOpenMath={() => setShowMathDialog(true)}
         onImport={() => !isEditMode && fileInputRef.current?.click()}
         onSaveDraft={doSaveDraft}
