@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Editor } from "@tiptap/react";
+import type { MarkdownCodeEditorHandle } from "./markdown-code-editor";
 import {
   Bold,
   Italic,
@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 type ContextMenuProps = {
-  editor: Editor | null;
+  codeEditorRef: React.RefObject<MarkdownCodeEditorHandle | null>;
 };
 
 type MenuItem = {
@@ -32,20 +32,19 @@ type MenuItem = {
 
 type MenuSection = MenuItem[];
 
-export function EditorContextMenu({ editor }: ContextMenuProps) {
+export function EditorContextMenu({ codeEditorRef }: ContextMenuProps) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
-      // only intercept right-click inside the tiptap editor
       const target = e.target as HTMLElement;
-      if (!target.closest(".tiptap-editor")) return;
+      if (!target.closest("textarea")) return;
 
       e.preventDefault();
-      const sel = window.getSelection();
-      setHasSelection(!!sel && sel.toString().length > 0);
+      const ta = codeEditorRef.current?.getTextarea();
+      setHasSelection(!!ta && ta.selectionStart !== ta.selectionEnd);
       setPos({ x: e.clientX, y: e.clientY });
     };
 
@@ -65,9 +64,12 @@ export function EditorContextMenu({ editor }: ContextMenuProps) {
       document.removeEventListener("click", handleClick);
       document.removeEventListener("scroll", handleScroll, true);
     };
-  }, []);
+  }, [codeEditorRef]);
 
-  if (!pos || !editor) return null;
+  if (!pos) return null;
+
+  const h = codeEditorRef.current;
+  if (!h) return null;
 
   const close = () => setPos(null);
 
@@ -101,22 +103,22 @@ export function EditorContextMenu({ editor }: ContextMenuProps) {
         {
           label: "bold",
           icon: Bold,
-          action: () => run(() => editor.chain().focus().toggleBold().run()),
+          action: () => run(() => h.wrapSelection("**", "**")),
         },
         {
           label: "italic",
           icon: Italic,
-          action: () => run(() => editor.chain().focus().toggleItalic().run()),
+          action: () => run(() => h.wrapSelection("*", "*")),
         },
         {
           label: "strikethrough",
           icon: Strikethrough,
-          action: () => run(() => editor.chain().focus().toggleStrike().run()),
+          action: () => run(() => h.wrapSelection("~~", "~~")),
         },
         {
           label: "code",
           icon: Code,
-          action: () => run(() => editor.chain().focus().toggleCode().run()),
+          action: () => run(() => h.wrapSelection("`", "`")),
         },
         {
           label: "link",
@@ -124,7 +126,7 @@ export function EditorContextMenu({ editor }: ContextMenuProps) {
           action: () =>
             run(() => {
               const url = window.prompt("url:");
-              if (url) editor.chain().focus().setLink({ href: url }).run();
+              if (url) h.wrapSelection("[", `](${url})`);
             }),
         },
       ]
@@ -134,32 +136,27 @@ export function EditorContextMenu({ editor }: ContextMenuProps) {
     {
       label: "heading 1",
       icon: Heading1,
-      action: () =>
-        run(() => editor.chain().focus().toggleHeading({ level: 1 }).run()),
+      action: () => run(() => h.insertLine("# ")),
     },
     {
       label: "heading 2",
       icon: Heading2,
-      action: () =>
-        run(() => editor.chain().focus().toggleHeading({ level: 2 }).run()),
+      action: () => run(() => h.insertLine("## ")),
     },
     {
       label: "bullet list",
       icon: List,
-      action: () =>
-        run(() => editor.chain().focus().toggleBulletList().run()),
+      action: () => run(() => h.insertLine("- ")),
     },
     {
       label: "ordered list",
       icon: ListOrdered,
-      action: () =>
-        run(() => editor.chain().focus().toggleOrderedList().run()),
+      action: () => run(() => h.insertLine("1. ")),
     },
     {
       label: "blockquote",
       icon: Quote,
-      action: () =>
-        run(() => editor.chain().focus().toggleBlockquote().run()),
+      action: () => run(() => h.insertLine("> ")),
     },
   ];
 
@@ -168,7 +165,14 @@ export function EditorContextMenu({ editor }: ContextMenuProps) {
         {
           label: "delete",
           icon: Trash2,
-          action: () => run(() => editor.chain().focus().deleteSelection().run()),
+          action: () =>
+            run(() => {
+              const ta = h.getTextarea();
+              if (ta) {
+                ta.setRangeText("", ta.selectionStart, ta.selectionEnd, "end");
+                ta.dispatchEvent(new Event("input", { bubbles: true }));
+              }
+            }),
         },
       ]
     : [];
@@ -177,7 +181,6 @@ export function EditorContextMenu({ editor }: ContextMenuProps) {
     (s) => s.length > 0
   );
 
-  // adjust position to stay in viewport
   const menuWidth = 180;
   const menuHeight = sections.reduce(
     (acc, s) => acc + s.length * 28 + (acc > 0 ? 8 : 0),

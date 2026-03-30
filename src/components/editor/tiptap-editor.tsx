@@ -8,6 +8,7 @@ import { TaskItem } from "@tiptap/extension-task-item";
 import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { Placeholder } from "@tiptap/extension-placeholder";
+import { Focus } from "@tiptap/extension-focus";
 import { Typography } from "@tiptap/extension-typography";
 import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
@@ -19,12 +20,14 @@ type TiptapEditorProps = {
   content: string;
   onChange: (markdown: string) => void;
   onEditorReady: (editor: Editor) => void;
+  editorFont?: string;
 };
 
 export function TiptapEditor({
   content,
   onChange,
   onEditorReady,
+  editorFont,
 }: TiptapEditorProps) {
   const initialContentRef = useRef(content);
   const isSettingContent = useRef(false);
@@ -49,6 +52,10 @@ export function TiptapEditor({
       CodeBlockLowlight.configure({ lowlight }),
       Placeholder.configure({
         placeholder: "start writing...",
+      }),
+      Focus.configure({
+        className: "has-focus",
+        mode: "deepest",
       }),
       Typography,
       Markdown.configure({
@@ -90,10 +97,15 @@ export function TiptapEditor({
 
   if (!editor) return null;
 
+  const fontStyle = {
+    fontFamily: editorFont || "var(--font-mono), 'Fira Code', 'SF Mono', ui-monospace, monospace",
+  };
+
   return (
     <EditorContent
       editor={editor}
       className="flex-1 overflow-auto p-4"
+      style={fontStyle}
     />
   );
 }

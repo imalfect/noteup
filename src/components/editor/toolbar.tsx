@@ -20,10 +20,11 @@ import {
   Redo2,
   CodeSquare,
 } from "lucide-react";
-import type { Editor } from "@tiptap/react";
+import type { MarkdownCodeEditorHandle } from "./markdown-code-editor";
+import { Tooltip } from "@/components/ui/tooltip";
 
 type ToolbarProps = {
-  editor: Editor | null;
+  codeEditorRef: React.RefObject<MarkdownCodeEditorHandle | null>;
   onExportPdf: () => void;
 };
 
@@ -32,152 +33,152 @@ type ToolItem =
   | {
       icon: React.ComponentType<{ className?: string }>;
       title: string;
-      action: (e: Editor) => void;
-      isActive?: (e: Editor) => boolean;
+      action: (h: MarkdownCodeEditorHandle) => void;
     };
 
 const tools: ToolItem[] = [
   {
     icon: Undo2,
     title: "undo",
-    action: (e) => e.chain().focus().undo().run(),
+    action: (h) => {
+      const ta = h.getTextarea();
+      if (ta) {
+        ta.focus();
+        document.execCommand("undo");
+      }
+    },
   },
   {
     icon: Redo2,
     title: "redo",
-    action: (e) => e.chain().focus().redo().run(),
+    action: (h) => {
+      const ta = h.getTextarea();
+      if (ta) {
+        ta.focus();
+        document.execCommand("redo");
+      }
+    },
   },
   "sep",
   {
     icon: Bold,
     title: "bold",
-    action: (e) => e.chain().focus().toggleBold().run(),
-    isActive: (e) => e.isActive("bold"),
+    action: (h) => h.wrapSelection("**", "**"),
   },
   {
     icon: Italic,
     title: "italic",
-    action: (e) => e.chain().focus().toggleItalic().run(),
-    isActive: (e) => e.isActive("italic"),
+    action: (h) => h.wrapSelection("*", "*"),
   },
   {
     icon: Strikethrough,
     title: "strikethrough",
-    action: (e) => e.chain().focus().toggleStrike().run(),
-    isActive: (e) => e.isActive("strike"),
+    action: (h) => h.wrapSelection("~~", "~~"),
   },
   {
     icon: Code,
     title: "inline code",
-    action: (e) => e.chain().focus().toggleCode().run(),
-    isActive: (e) => e.isActive("code"),
+    action: (h) => h.wrapSelection("`", "`"),
   },
   "sep",
   {
     icon: Heading1,
     title: "heading 1",
-    action: (e) => e.chain().focus().toggleHeading({ level: 1 }).run(),
-    isActive: (e) => e.isActive("heading", { level: 1 }),
+    action: (h) => h.insertLine("# "),
   },
   {
     icon: Heading2,
     title: "heading 2",
-    action: (e) => e.chain().focus().toggleHeading({ level: 2 }).run(),
-    isActive: (e) => e.isActive("heading", { level: 2 }),
+    action: (h) => h.insertLine("## "),
   },
   {
     icon: Heading3,
     title: "heading 3",
-    action: (e) => e.chain().focus().toggleHeading({ level: 3 }).run(),
-    isActive: (e) => e.isActive("heading", { level: 3 }),
+    action: (h) => h.insertLine("### "),
   },
   "sep",
   {
     icon: List,
     title: "bullet list",
-    action: (e) => e.chain().focus().toggleBulletList().run(),
-    isActive: (e) => e.isActive("bulletList"),
+    action: (h) => h.insertLine("- "),
   },
   {
     icon: ListOrdered,
     title: "ordered list",
-    action: (e) => e.chain().focus().toggleOrderedList().run(),
-    isActive: (e) => e.isActive("orderedList"),
+    action: (h) => h.insertLine("1. "),
   },
   {
     icon: CheckSquare,
     title: "task list",
-    action: (e) => e.chain().focus().toggleTaskList().run(),
-    isActive: (e) => e.isActive("taskList"),
+    action: (h) => h.insertLine("- [ ] "),
   },
   "sep",
   {
     icon: Quote,
     title: "blockquote",
-    action: (e) => e.chain().focus().toggleBlockquote().run(),
-    isActive: (e) => e.isActive("blockquote"),
+    action: (h) => h.insertLine("> "),
   },
   {
     icon: CodeSquare,
     title: "code block",
-    action: (e) => e.chain().focus().toggleCodeBlock().run(),
-    isActive: (e) => e.isActive("codeBlock"),
+    action: (h) => h.insertSyntax("\n```\n", "\n```\n"),
   },
   {
     icon: Minus,
     title: "horizontal rule",
-    action: (e) => e.chain().focus().setHorizontalRule().run(),
+    action: (h) => h.insertSyntax("\n---\n"),
   },
   {
     icon: Link2,
     title: "link",
-    action: (e) => {
+    action: (h) => {
       const url = window.prompt("url:");
       if (url) {
-        e.chain().focus().setLink({ href: url }).run();
+        h.wrapSelection("[", `](${url})`);
       }
     },
-    isActive: (e) => e.isActive("link"),
   },
   {
     icon: Table,
     title: "table",
-    action: (e) =>
-      e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    action: (h) =>
+      h.insertSyntax(
+        "\n| Header | Header | Header |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n"
+      ),
   },
 ];
 
-export function Toolbar({ editor, onExportPdf }: ToolbarProps) {
+export function Toolbar({ codeEditorRef, onExportPdf }: ToolbarProps) {
   return (
     <div className="flex items-center gap-0.5 border-b border-border px-2 py-1.5 overflow-x-auto">
       {tools.map((tool, i) =>
         tool === "sep" ? (
           <div key={i} className="w-px h-4 bg-border mx-1" />
         ) : (
-          <button
-            key={i}
-            title={tool.title}
-            onClick={() => editor && tool.action(editor)}
-            className={`p-1.5 transition-colors ${
-              editor && tool.isActive?.(editor)
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <tool.icon className="h-3.5 w-3.5" />
-          </button>
+          <Tooltip key={i} content={tool.title}>
+            <button
+              onClick={() => {
+                const handle = codeEditorRef.current;
+                if (handle) tool.action(handle);
+              }}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <tool.icon className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
         )
       )}
 
       <div className="flex-1" />
 
-      <button
-        title="export to pdf"
-        onClick={onExportPdf}
-        className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <FileDown className="h-3.5 w-3.5" />
-      </button>
+      <Tooltip content="export to pdf">
+        <button
+          onClick={onExportPdf}
+          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <FileDown className="h-3.5 w-3.5" />
+        </button>
+      </Tooltip>
     </div>
   );
 }

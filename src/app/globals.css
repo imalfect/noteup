@@ -97,7 +97,7 @@ body {
 
 /* tiptap editor styles */
 .tiptap-editor {
-  font-family: var(--font-mono);
+  font-family: inherit;
   font-size: 13px;
   line-height: 1.7;
   color: var(--foreground);
@@ -117,6 +117,44 @@ body {
   color: var(--muted-foreground);
   pointer-events: none;
   height: 0;
+}
+
+/* markdown decoration: show syntax markers on focused blocks */
+.tiptap-editor h1.has-focus::before,
+.tiptap-editor h2.has-focus::before,
+.tiptap-editor h3.has-focus::before,
+.tiptap-editor h4.has-focus::before,
+.tiptap-editor h5.has-focus::before,
+.tiptap-editor h6.has-focus::before {
+  color: var(--muted-foreground);
+  font-weight: 400;
+  font-size: 0.75em;
+  opacity: 0.6;
+  margin-right: 0.35em;
+}
+
+.tiptap-editor h1.has-focus::before { content: "#"; }
+.tiptap-editor h2.has-focus::before { content: "##"; }
+.tiptap-editor h3.has-focus::before { content: "###"; }
+.tiptap-editor h4.has-focus::before { content: "####"; }
+.tiptap-editor h5.has-focus::before { content: "#####"; }
+.tiptap-editor h6.has-focus::before { content: "######"; }
+
+.tiptap-editor blockquote.has-focus::before {
+  content: ">";
+  color: var(--muted-foreground);
+  font-weight: 400;
+  font-size: 0.75em;
+  opacity: 0.6;
+  margin-right: 0.35em;
+}
+
+.tiptap-editor hr.has-focus::before {
+  content: "---";
+  color: var(--muted-foreground);
+  font-weight: 400;
+  font-size: 0.75em;
+  opacity: 0.6;
 }
 
 .tiptap-editor h1 {
@@ -285,7 +323,7 @@ body {
 
 /* markdown preview styles */
 .markdown-preview {
-  font-family: var(--font-mono);
+  font-family: inherit;
   font-size: 13px;
   line-height: 1.7;
   color: var(--foreground);

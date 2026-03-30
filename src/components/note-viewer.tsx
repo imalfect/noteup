@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { Title } from "@/components/title";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -40,6 +40,15 @@ type VersionSummary = {
   createdAt: string;
 };
 
+type VersionDetail = {
+  version: number;
+  title: string;
+  content: string;
+  encrypted: boolean;
+  salt: string | null;
+  iv: string | null;
+};
+
 export function NoteViewer({ note }: { note: NoteData }) {
   const [decryptedContent, setDecryptedContent] = useState<string | null>(
     note.encrypted ? null : note.content
@@ -52,24 +61,55 @@ export function NoteViewer({ note }: { note: NoteData }) {
   const [viewingVersion, setViewingVersion] = useState<number | null>(null);
   const [versionContent, setVersionContent] = useState<string | null>(null);
   const [versionTitle, setVersionTitle] = useState<string | null>(null);
-  const contentRef = useRef<string | null>(null);
+  const [versionEncrypted, setVersionEncrypted] = useState(false);
+  const [versionNeedsDecrypt, setVersionNeedsDecrypt] = useState(false);
+  const [versionSalt, setVersionSalt] = useState<string | null>(null);
+  const [versionIv, setVersionIv] = useState<string | null>(null);
+
+  // cache password across version switches within the session
+  const cachedPasswordRef = useRef<string>("");
   const router = useRouter();
 
+  const isCurrentVersionEncrypted = viewingVersion ? versionEncrypted : note.encrypted;
+
+  const tryDecrypt = async (
+    content: string,
+    salt: string,
+    iv: string,
+    pwd: string
+  ): Promise<string | null> => {
+    try {
+      return await decryptContent(content, pwd, salt, iv);
+    } catch {
+      return null;
+    }
+  };
+
   const handleDecrypt = async () => {
-    if (!password || !note.salt || !note.iv) return;
+    if (!password) return;
     setDecrypting(true);
     try {
-      const content = await decryptContent(
-        note.content,
-        password,
-        note.salt,
-        note.iv
-      );
-      setDecryptedContent(content);
-      contentRef.current = content;
-      toast("decrypted successfully");
-    } catch {
-      toast("wrong password — try again");
+      // decrypt whichever version is currently active
+      if (viewingVersion && versionNeedsDecrypt && versionSalt && versionIv) {
+        const result = await tryDecrypt(versionContent!, versionSalt, versionIv, password);
+        if (result) {
+          setVersionContent(result);
+          setVersionNeedsDecrypt(false);
+          cachedPasswordRef.current = password;
+          toast("decrypted successfully");
+        } else {
+          toast("wrong password — try again");
+        }
+      } else if (note.encrypted && !decryptedContent && note.salt && note.iv) {
+        const result = await tryDecrypt(note.content, note.salt, note.iv, password);
+        if (result) {
+          setDecryptedContent(result);
+          cachedPasswordRef.current = password;
+          toast("decrypted successfully");
+        } else {
+          toast("wrong password — try again");
+        }
+      }
     } finally {
       setDecrypting(false);
     }
@@ -124,10 +164,15 @@ export function NoteViewer({ note }: { note: NoteData }) {
   };
 
   const loadVersion = async (version: number) => {
+    // clicking current version = go back to latest
     if (version === note.version) {
       setViewingVersion(null);
       setVersionContent(null);
       setVersionTitle(null);
+      setVersionEncrypted(false);
+      setVersionNeedsDecrypt(false);
+      setVersionSalt(null);
+      setVersionIv(null);
       return;
     }
     try {
@@ -135,17 +180,58 @@ export function NoteViewer({ note }: { note: NoteData }) {
         `/api/note/${encodeURIComponent(note.slug)}/versions/${version}`
       );
       if (!res.ok) throw new Error();
-      const data = await res.json();
+      const data: VersionDetail = await res.json();
       setViewingVersion(version);
-      setVersionContent(data.content);
       setVersionTitle(data.title);
+      setVersionEncrypted(data.encrypted);
+
+      if (data.encrypted && data.salt && data.iv) {
+        // try auto-decrypt with cached password
+        if (cachedPasswordRef.current) {
+          const result = await tryDecrypt(
+            data.content,
+            data.salt,
+            data.iv,
+            cachedPasswordRef.current
+          );
+          if (result) {
+            setVersionContent(result);
+            setVersionNeedsDecrypt(false);
+            setVersionSalt(null);
+            setVersionIv(null);
+            return;
+          }
+        }
+        // need manual decryption
+        setVersionContent(data.content);
+        setVersionNeedsDecrypt(true);
+        setVersionSalt(data.salt);
+        setVersionIv(data.iv);
+      } else {
+        setVersionContent(data.content);
+        setVersionNeedsDecrypt(false);
+        setVersionSalt(null);
+        setVersionIv(null);
+      }
     } catch {
       toast("failed to load version");
     }
   };
 
   const createdDate = new Date(note.createdAt);
-  const displayContent = versionContent || decryptedContent;
+
+  // determine what to show
+  const needsDecrypt =
+    viewingVersion
+      ? versionNeedsDecrypt
+      : note.encrypted && !decryptedContent;
+
+  const displayContent = needsDecrypt
+    ? null
+    : viewingVersion
+      ? versionContent
+      : decryptedContent;
+
   const displayTitle = versionTitle || note.title;
 
   return (
@@ -183,7 +269,9 @@ export function NoteViewer({ note }: { note: NoteData }) {
               <Shield className="h-3 w-3" />
               encrypted
             </span>
-            <span>{note.encrypted ? "yes — aes-256-gcm" : "no"}</span>
+            <span>
+              {isCurrentVersionEncrypted ? "yes — aes-256-gcm" : "no"}
+            </span>
           </div>
           <div className="p-3 flex justify-between font-mono text-xs">
             <span className="text-muted-foreground flex items-center gap-1.5">
@@ -256,11 +344,13 @@ export function NoteViewer({ note }: { note: NoteData }) {
         )}
 
         {/* decrypt form */}
-        {note.encrypted && !decryptedContent && (
+        {needsDecrypt && (
           <div className="border border-border p-4 space-y-3">
             <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
               <Lock className="h-3.5 w-3.5" />
-              this note is encrypted
+              {viewingVersion
+                ? `version ${viewingVersion} is encrypted`
+                : "this note is encrypted"}
             </div>
             <div className="flex gap-2">
               <input

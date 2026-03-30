@@ -5,7 +5,7 @@ import { MarkdownPreview } from "@/components/markdown-preview";
 import { Title } from "@/components/title";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Minus, Plus } from "lucide-react";
+import { ArrowLeft, Download, Minus, Plus, ChevronUp, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { jsPDF } from "jspdf";
@@ -24,21 +24,22 @@ const PAGE_SIZES: Record<
 };
 
 const FONT_OPTIONS = [
-  {
-    value: "mono",
-    label: "monospace",
-    css: '"Courier New", "Courier", monospace',
-  },
-  {
-    value: "sans",
-    label: "sans-serif",
-    css: '"Helvetica", "Arial", sans-serif',
-  },
-  {
-    value: "serif",
-    label: "serif",
-    css: '"Georgia", "Times New Roman", serif',
-  },
+  // monospace
+  { value: "jetbrains-mono", label: "JetBrains Mono", css: "'JetBrains Mono', monospace", group: "monospace" },
+  { value: "fira-code", label: "Fira Code", css: "'Fira Code', monospace", group: "monospace" },
+  { value: "sf-mono", label: "SF Mono", css: "'SF Mono', monospace", group: "monospace" },
+  { value: "courier-new", label: "Courier New", css: "'Courier New', monospace", group: "monospace" },
+  // sans-serif
+  { value: "inter", label: "Inter", css: "'Inter', sans-serif", group: "sans-serif" },
+  { value: "figtree", label: "Figtree", css: "'Figtree', sans-serif", group: "sans-serif" },
+  { value: "lato", label: "Lato", css: "'Lato', sans-serif", group: "sans-serif" },
+  { value: "dm-sans", label: "DM Sans", css: "'DM Sans', sans-serif", group: "sans-serif" },
+  { value: "system", label: "System", css: "system-ui, sans-serif", group: "sans-serif" },
+  // serif
+  { value: "times-new-roman", label: "Times New Roman", css: "'Times New Roman', serif", group: "serif" },
+  { value: "georgia", label: "Georgia", css: "'Georgia', serif", group: "serif" },
+  { value: "merriweather", label: "Merriweather", css: "'Merriweather', serif", group: "serif" },
+  { value: "lora", label: "Lora", css: "'Lora', serif", group: "serif" },
 ];
 
 const DRAFT_KEY = "noteup-draft";
@@ -88,14 +89,17 @@ export function ExportPageContent() {
   const [orientation, setOrientation] = useState<Orientation>("portrait");
   const [fontSize, setFontSize] = useState(12);
   const [marginMm, setMarginMm] = useState(20);
-  const [fontFamily, setFontFamily] = useState("mono");
+  const [fontFamily, setFontFamily] = useState("jetbrains-mono");
   const [darkMode, setDarkMode] = useState(false);
   const [showPageNumbers, setShowPageNumbers] = useState(true);
   const [showTitle, setShowTitle] = useState(true);
   const [lineHeight, setLineHeight] = useState(1.6);
 
   const previewRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     setMounted(true);
@@ -127,20 +131,62 @@ export function ExportPageContent() {
     orientation === "portrait" ? dims.height : dims.width;
 
   const mmToPx = (mm: number) => (mm * 96) / 25.4;
-  const previewScale = 0.65;
+  const previewScale = 0.85;
   const pageWidthPx = mmToPx(effectiveWidth);
   const pageHeightPx = mmToPx(effectiveHeight);
   const marginPx = mmToPx(marginMm);
 
-  const fontObj = FONT_OPTIONS.find((f) => f.value === fontFamily)!;
-  const fontFamilyCSS = fontObj.css;
+  const fontFamilyCSS = FONT_OPTIONS.find((f) => f.value === fontFamily)?.css || "'Courier New', monospace";
 
-  // self-contained colors — independent of app theme
   const bgColor = darkMode ? "#080808" : "#ffffff";
   const fgColor = darkMode ? "#ededed" : "#171717";
   const mutedColor = darkMode ? "#808080" : "#808080";
   const borderColor = darkMode ? "#333333" : "#dddddd";
   const codeBgColor = darkMode ? "#111111" : "#f5f5f5";
+
+  // estimate total pages from content height
+  useEffect(() => {
+    if (!previewRef.current) return;
+    const contentEl = previewRef.current.querySelector("[data-pdf-content]") as HTMLElement;
+    if (!contentEl) return;
+    const observer = new ResizeObserver(() => {
+      // subtract padding to get actual content height
+      const contentHeight = contentEl.scrollHeight - marginPx * 2;
+      const usableHeight = pageHeightPx - marginPx * 2;
+      const pages = Math.max(1, Math.ceil(contentHeight / usableHeight));
+      setTotalPages(pages);
+    });
+    observer.observe(contentEl);
+    return () => observer.disconnect();
+  }, [content, pageHeightPx, marginPx, fontSize, lineHeight, fontFamily, showTitle]);
+
+  // track scroll position to determine current page
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const scrollTop = container.scrollTop;
+      const scaledPageHeight = pageHeightPx * previewScale;
+      const pageGap = 32 * previewScale;
+      const page = Math.floor(scrollTop / (scaledPageHeight + pageGap)) + 1;
+      setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    };
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [pageHeightPx, previewScale, totalPages]);
+
+  const scrollToPage = (page: number) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const clamped = Math.max(1, Math.min(page, totalPages));
+    const scaledPageHeight = pageHeightPx * previewScale;
+    const pageGap = 32 * previewScale;
+    container.scrollTo({
+      top: (clamped - 1) * (scaledPageHeight + pageGap),
+      behavior: "smooth",
+    });
+    setCurrentPage(clamped);
+  };
 
   const handleExport = useCallback(async () => {
     if (!previewRef.current) return;
@@ -162,13 +208,13 @@ export function ExportPageContent() {
       await pdf.html(contentEl, {
         callback: (doc) => {
           if (showPageNumbers) {
-            const totalPages = doc.getNumberOfPages();
-            for (let i = 1; i <= totalPages; i++) {
+            const total = doc.getNumberOfPages();
+            for (let i = 1; i <= total; i++) {
               doc.setPage(i);
               doc.setFontSize(8);
               doc.setTextColor(128);
               doc.text(
-                `${i} / ${totalPages}`,
+                `${i} / ${total}`,
                 effectiveWidth / 2,
                 effectiveHeight - 8,
                 { align: "center" }
@@ -306,10 +352,14 @@ export function ExportPageContent() {
               onChange={(e) => setFontFamily(e.target.value)}
               className="w-full bg-transparent border border-border p-2 font-mono text-xs focus:border-foreground/30 focus:outline-none"
             >
-              {FONT_OPTIONS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
+              {["monospace", "sans-serif", "serif"].map((group) => (
+                <optgroup key={group} label={group}>
+                  {FONT_OPTIONS.filter((f) => f.group === group).map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -394,106 +444,193 @@ export function ExportPageContent() {
         </div>
 
         {/* preview — fully self-contained, no CSS variable colors */}
-        <div className="flex-1 overflow-auto bg-muted p-8 flex justify-center">
+        <div className="flex-1 flex flex-col overflow-hidden">
           <div
-            ref={previewRef}
-            style={{
-              transform: `scale(${previewScale})`,
-              transformOrigin: "top center",
-            }}
+            ref={scrollContainerRef}
+            className="flex-1 overflow-auto bg-muted p-8 flex justify-center"
           >
-            {/*
-              data-pdf-content: all colors are hardcoded inline so the
-              preview is completely independent of the app's light/dark theme.
-              The font-family is set via inline style on this element AND
-              inherited by all children (no CSS variable indirection).
-            */}
             <div
-              data-pdf-content
+              ref={previewRef}
               style={{
-                width: `${pageWidthPx}px`,
-                minHeight: `${pageHeightPx}px`,
-                padding: `${marginPx}px`,
-                backgroundColor: bgColor,
-                color: fgColor,
-                fontFamily: fontFamilyCSS,
-                fontSize: `${fontSize}px`,
-                lineHeight: lineHeight,
-                boxShadow: "0 0 0 1px #333",
+                transform: `scale(${previewScale})`,
+                transformOrigin: "top center",
               }}
             >
-              {/* override markdown-preview to use inline colors */}
-              <style>{`
-                [data-pdf-content] * {
-                  font-family: inherit !important;
-                  color: inherit !important;
-                }
-                [data-pdf-content] h1,
-                [data-pdf-content] h2,
-                [data-pdf-content] h3,
-                [data-pdf-content] h4,
-                [data-pdf-content] h5,
-                [data-pdf-content] h6 {
-                  color: ${fgColor} !important;
-                }
-                [data-pdf-content] a {
-                  text-decoration: underline;
-                  text-underline-offset: 2px;
-                }
-                [data-pdf-content] blockquote {
-                  border-left: 2px solid ${borderColor};
-                  padding-left: 1rem;
-                  color: ${mutedColor} !important;
-                  margin: 0.75rem 0;
-                }
-                [data-pdf-content] blockquote * {
-                  color: ${mutedColor} !important;
-                }
-                [data-pdf-content] pre {
-                  background: ${codeBgColor} !important;
-                  border: 1px solid ${borderColor};
-                  padding: 0.75rem;
-                  overflow-x: auto;
-                  margin: 0.75rem 0;
-                }
-                [data-pdf-content] :not(pre) > code {
-                  background: ${codeBgColor} !important;
-                  padding: 0.15rem 0.3rem;
-                  border: 1px solid ${borderColor};
-                }
-                [data-pdf-content] th {
-                  background: ${codeBgColor} !important;
-                }
-                [data-pdf-content] th,
-                [data-pdf-content] td {
-                  border-color: ${borderColor} !important;
-                }
-                [data-pdf-content] hr {
-                  border-color: ${borderColor} !important;
-                }
-                [data-pdf-content] .katex * {
-                  color: ${fgColor} !important;
-                }
-              `}</style>
+              <div
+                data-pdf-content
+                style={{
+                  width: `${pageWidthPx}px`,
+                  minHeight: `${pageHeightPx}px`,
+                  padding: `${marginPx}px`,
+                  backgroundColor: bgColor,
+                  color: fgColor,
+                  fontFamily: fontFamilyCSS,
+                  fontSize: `${fontSize}px`,
+                  lineHeight: lineHeight,
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+                }}
+              >
+                <style>{`
+                  [data-pdf-content] .markdown-preview,
+                  [data-pdf-content] .markdown-preview * {
+                    font-family: inherit !important;
+                    color: inherit !important;
+                    font-size: inherit !important;
+                    line-height: inherit !important;
+                  }
+                  [data-pdf-content] .markdown-preview h1 {
+                    font-size: 1.5em !important;
+                    font-weight: 700;
+                    margin: 1em 0 0.5em;
+                    padding-bottom: 0.25em;
+                    border-bottom: 1px solid ${borderColor};
+                  }
+                  [data-pdf-content] .markdown-preview h2 {
+                    font-size: 1.3em !important;
+                    font-weight: 600;
+                    margin: 0.9em 0 0.4em;
+                  }
+                  [data-pdf-content] .markdown-preview h3 {
+                    font-size: 1.15em !important;
+                    font-weight: 600;
+                    margin: 0.8em 0 0.4em;
+                  }
+                  [data-pdf-content] .markdown-preview h4,
+                  [data-pdf-content] .markdown-preview h5,
+                  [data-pdf-content] .markdown-preview h6 {
+                    font-size: 1em !important;
+                    font-weight: 600;
+                    margin: 0.6em 0 0.3em;
+                  }
+                  [data-pdf-content] .markdown-preview p {
+                    margin: 0.4em 0;
+                  }
+                  [data-pdf-content] a {
+                    text-decoration: underline;
+                    text-underline-offset: 2px;
+                  }
+                  [data-pdf-content] blockquote {
+                    border-left: 2px solid ${borderColor};
+                    padding-left: 1rem;
+                    color: ${mutedColor} !important;
+                    margin: 0.75rem 0;
+                  }
+                  [data-pdf-content] blockquote * {
+                    color: ${mutedColor} !important;
+                  }
+                  [data-pdf-content] pre {
+                    background: ${codeBgColor} !important;
+                    border: 1px solid ${borderColor};
+                    padding: 0.75rem;
+                    overflow-x: auto;
+                    margin: 0.75rem 0;
+                    font-size: 0.85em !important;
+                  }
+                  [data-pdf-content] pre *,
+                  [data-pdf-content] code {
+                    font-family: "Courier New", monospace !important;
+                  }
+                  [data-pdf-content] :not(pre) > code {
+                    background: ${codeBgColor} !important;
+                    padding: 0.15rem 0.3rem;
+                    border: 1px solid ${borderColor};
+                    font-size: 0.85em !important;
+                  }
+                  [data-pdf-content] th {
+                    background: ${codeBgColor} !important;
+                  }
+                  [data-pdf-content] th,
+                  [data-pdf-content] td {
+                    border-color: ${borderColor} !important;
+                  }
+                  [data-pdf-content] hr {
+                    border-color: ${borderColor} !important;
+                  }
+                  [data-pdf-content] .katex * {
+                    color: ${fgColor} !important;
+                  }
+                  [data-pdf-content] .hljs,
+                  [data-pdf-content] pre {
+                    background: ${codeBgColor} !important;
+                    color: ${fgColor} !important;
+                  }
+                  [data-pdf-content] .hljs-keyword,
+                  [data-pdf-content] .hljs-selector-tag,
+                  [data-pdf-content] .hljs-literal,
+                  [data-pdf-content] .hljs-section,
+                  [data-pdf-content] .hljs-link {
+                    color: ${darkMode ? "#c678dd" : "#a626a4"} !important;
+                  }
+                  [data-pdf-content] .hljs-string,
+                  [data-pdf-content] .hljs-title,
+                  [data-pdf-content] .hljs-name,
+                  [data-pdf-content] .hljs-type,
+                  [data-pdf-content] .hljs-attribute,
+                  [data-pdf-content] .hljs-symbol,
+                  [data-pdf-content] .hljs-bullet,
+                  [data-pdf-content] .hljs-addition,
+                  [data-pdf-content] .hljs-variable,
+                  [data-pdf-content] .hljs-template-tag,
+                  [data-pdf-content] .hljs-template-variable {
+                    color: ${darkMode ? "#98c379" : "#50a14f"} !important;
+                  }
+                  [data-pdf-content] .hljs-comment,
+                  [data-pdf-content] .hljs-quote,
+                  [data-pdf-content] .hljs-deletion,
+                  [data-pdf-content] .hljs-meta {
+                    color: ${darkMode ? "#5c6370" : "#a0a1a7"} !important;
+                  }
+                  [data-pdf-content] .hljs-number,
+                  [data-pdf-content] .hljs-regexp,
+                  [data-pdf-content] .hljs-literal,
+                  [data-pdf-content] .hljs-built_in {
+                    color: ${darkMode ? "#d19a66" : "#986801"} !important;
+                  }
+                `}</style>
 
-              {showTitle && (
-                <h1
-                  style={{
-                    fontSize: `${fontSize * 1.5}px`,
-                    fontWeight: 700,
-                    marginBottom: `${fontSize}px`,
-                    paddingBottom: `${fontSize * 0.5}px`,
-                    borderBottom: `1px solid ${borderColor}`,
-                    color: fgColor,
-                  }}
-                >
-                  {title}
-                </h1>
-              )}
-              <div className="markdown-preview">
-                <MarkdownPreview content={content} />
+                {showTitle && (
+                  <h1
+                    style={{
+                      fontSize: `${fontSize * 1.5}px`,
+                      fontWeight: 700,
+                      marginBottom: `${fontSize}px`,
+                      paddingBottom: `${fontSize * 0.5}px`,
+                      borderBottom: `1px solid ${borderColor}`,
+                      color: fgColor,
+                      fontFamily: fontFamilyCSS,
+                    }}
+                  >
+                    {title}
+                  </h1>
+                )}
+                <div className="markdown-preview">
+                  <MarkdownPreview content={content} />
+                </div>
               </div>
             </div>
+          </div>
+
+          {/* page navigation bar */}
+          <div className="flex items-center justify-center gap-3 border-t border-border px-4 py-2 bg-card">
+            <button
+              onClick={() => scrollToPage(currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+              title="previous page"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <span className="font-mono text-xs text-muted-foreground">
+              page {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => scrollToPage(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+              title="next page"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </div>
