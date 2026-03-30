@@ -25,7 +25,7 @@ export default function Home() {
           </div>
           <div className="p-3 flex justify-between font-mono text-xs">
             <span className="text-muted-foreground">editor</span>
-            <span>codemirror + gfm + latex</span>
+            <span>tiptap wysiwyg + gfm + latex</span>
           </div>
           <div className="p-3 flex justify-between font-mono text-xs">
             <span className="text-muted-foreground">export</span>

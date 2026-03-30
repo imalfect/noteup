@@ -38,6 +38,7 @@ export default async function NotePage({ params }: Props) {
         salt: note.salt,
         iv: note.iv,
         createdAt: note.createdAt.toISOString(),
+        version: note.version,
       }}
     />
   );

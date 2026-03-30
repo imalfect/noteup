@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { Title } from "@/components/title";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -14,6 +14,9 @@ import {
   Clock,
   Shield,
   Hash,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,6 +30,14 @@ type NoteData = {
   salt: string | null;
   iv: string | null;
   createdAt: string;
+  version: number;
+};
+
+type VersionSummary = {
+  id: string;
+  version: number;
+  title: string;
+  createdAt: string;
 };
 
 export function NoteViewer({ note }: { note: NoteData }) {
@@ -35,6 +46,12 @@ export function NoteViewer({ note }: { note: NoteData }) {
   );
   const [password, setPassword] = useState("");
   const [decrypting, setDecrypting] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState<VersionSummary[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [viewingVersion, setViewingVersion] = useState<number | null>(null);
+  const [versionContent, setVersionContent] = useState<string | null>(null);
+  const [versionTitle, setVersionTitle] = useState<string | null>(null);
   const contentRef = useRef<string | null>(null);
   const router = useRouter();
 
@@ -59,13 +76,13 @@ export function NoteViewer({ note }: { note: NoteData }) {
   };
 
   const copyContent = () => {
-    const content = decryptedContent || note.content;
+    const content = versionContent || decryptedContent || note.content;
     navigator.clipboard.writeText(content);
     toast("copied to clipboard");
   };
 
   const downloadMd = () => {
-    const content = decryptedContent || note.content;
+    const content = versionContent || decryptedContent || note.content;
     const blob = new Blob([content], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -77,16 +94,59 @@ export function NoteViewer({ note }: { note: NoteData }) {
   };
 
   const handleExportPdf = () => {
-    // store content in sessionStorage for the export page
-    const content = decryptedContent || note.content;
+    const content = versionContent || decryptedContent || note.content;
     sessionStorage.setItem(
       "noteup-export",
-      JSON.stringify({ content, title: note.title })
+      JSON.stringify({ content, title: versionTitle || note.title })
     );
     router.push("/export");
   };
 
+  const toggleVersions = async () => {
+    if (showVersions) {
+      setShowVersions(false);
+      return;
+    }
+    setShowVersions(true);
+    if (versions.length > 0) return;
+    setLoadingVersions(true);
+    try {
+      const res = await fetch(
+        `/api/note/${encodeURIComponent(note.slug)}/versions`
+      );
+      const data = await res.json();
+      setVersions(data.versions || []);
+    } catch {
+      toast("failed to load versions");
+    } finally {
+      setLoadingVersions(false);
+    }
+  };
+
+  const loadVersion = async (version: number) => {
+    if (version === note.version) {
+      setViewingVersion(null);
+      setVersionContent(null);
+      setVersionTitle(null);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/note/${encodeURIComponent(note.slug)}/versions/${version}`
+      );
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setViewingVersion(version);
+      setVersionContent(data.content);
+      setVersionTitle(data.title);
+    } catch {
+      toast("failed to load version");
+    }
+  };
+
   const createdDate = new Date(note.createdAt);
+  const displayContent = versionContent || decryptedContent;
+  const displayTitle = versionTitle || note.title;
 
   return (
     <div className="min-h-dvh py-12">
@@ -114,7 +174,8 @@ export function NoteViewer({ note }: { note: NoteData }) {
               created
             </span>
             <span>
-              {createdDate.toLocaleDateString()} {createdDate.toLocaleTimeString()}
+              {createdDate.toLocaleDateString()}{" "}
+              {createdDate.toLocaleTimeString()}
             </span>
           </div>
           <div className="p-3 flex justify-between font-mono text-xs">
@@ -124,7 +185,75 @@ export function NoteViewer({ note }: { note: NoteData }) {
             </span>
             <span>{note.encrypted ? "yes — aes-256-gcm" : "no"}</span>
           </div>
+          <div className="p-3 flex justify-between font-mono text-xs">
+            <span className="text-muted-foreground flex items-center gap-1.5">
+              <History className="h-3 w-3" />
+              version
+            </span>
+            <span>
+              {viewingVersion ? `v${viewingVersion}` : `v${note.version}`}
+              {viewingVersion && (
+                <span className="text-muted-foreground ml-1">(viewing old)</span>
+              )}
+            </span>
+          </div>
         </div>
+
+        {/* version history toggle */}
+        <button
+          onClick={toggleVersions}
+          className="w-full border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-2"
+        >
+          <History className="h-3 w-3 text-muted-foreground" />
+          version history
+          {showVersions ? (
+            <ChevronUp className="h-3 w-3 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          )}
+        </button>
+
+        {showVersions && (
+          <div className="border border-border divide-y divide-border">
+            {loadingVersions ? (
+              <div className="p-3 font-mono text-xs text-muted-foreground animate-pulse">
+                loading...
+              </div>
+            ) : versions.length === 0 ? (
+              <div className="p-3 font-mono text-xs text-muted-foreground">
+                no version history
+              </div>
+            ) : (
+              versions.map((v) => {
+                const vDate = new Date(v.createdAt);
+                const isCurrent = v.version === note.version && !viewingVersion;
+                const isViewing = v.version === viewingVersion;
+                return (
+                  <button
+                    key={v.id}
+                    onClick={() => loadVersion(v.version)}
+                    className={`w-full p-3 flex justify-between font-mono text-xs text-left hover:bg-accent transition-colors ${
+                      isCurrent || isViewing ? "bg-muted/50" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">v{v.version}</span>
+                      {v.version === note.version && (
+                        <span className="text-muted-foreground">(latest)</span>
+                      )}
+                      {isViewing && (
+                        <span className="text-muted-foreground">(viewing)</span>
+                      )}
+                    </div>
+                    <span className="text-muted-foreground">
+                      {vDate.toLocaleDateString()} {vDate.toLocaleTimeString()}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
 
         {/* decrypt form */}
         {note.encrypted && !decryptedContent && (
@@ -154,7 +283,7 @@ export function NoteViewer({ note }: { note: NoteData }) {
         )}
 
         {/* content */}
-        {decryptedContent !== null && (
+        {displayContent !== null && (
           <>
             {/* actions */}
             <div className="flex gap-2">
@@ -184,9 +313,9 @@ export function NoteViewer({ note }: { note: NoteData }) {
             {/* rendered content */}
             <div className="border border-border p-4">
               <h2 className="font-mono text-sm font-semibold mb-4">
-                {note.title}
+                {displayTitle}
               </h2>
-              <MarkdownPreview content={decryptedContent} />
+              <MarkdownPreview content={displayContent} />
             </div>
           </>
         )}

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { saveNote } from "@/db/functions/saveNote";
 import { slugAvailable } from "@/db/functions/slugAvailable";
+import { hashEditKey } from "@/lib/hash";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, slug, title, content, salt, iv, encrypted } = body;
+    const { id, slug, title, content, salt, iv, encrypted, editKey } = body;
 
-    if (!id || !slug || !content) {
+    if (!id || !slug || !content || !editKey) {
       return NextResponse.json(
         { error: "missing required fields" },
         { status: 400 }
@@ -29,6 +30,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const editKeyHash = hashEditKey(editKey);
+
     await saveNote({
       id,
       slug,
@@ -37,6 +40,7 @@ export async function POST(req: NextRequest) {
       salt: salt || null,
       iv: iv || null,
       encrypted: encrypted || false,
+      editKeyHash,
     });
 
     return NextResponse.json({ id, slug });

@@ -2,14 +2,22 @@
 
 import { useState, useEffect } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import { Lock, Shield, Check, Copy, ExternalLink, X } from "lucide-react";
+import { Lock, Shield, Check, Copy, ExternalLink, X, Key, AlertTriangle, Download } from "lucide-react";
 import { toast } from "sonner";
+import { jsPDF } from "jspdf";
+
+type PublishResult = {
+  url: string;
+  editKey: string;
+} | null;
 
 type PublishDialogProps = {
   open: boolean;
   onClose: () => void;
-  onPublish: (slug: string, password: string) => Promise<string | null>;
+  onPublish: (slug: string, password: string) => Promise<PublishResult>;
   defaultSlug: string;
+  isEditMode?: boolean;
+  onSaveEdit?: () => Promise<boolean>;
 };
 
 export function PublishDialog({
@@ -17,6 +25,8 @@ export function PublishDialog({
   onClose,
   onPublish,
   defaultSlug,
+  isEditMode,
+  onSaveEdit,
 }: PublishDialogProps) {
   const [slug, setSlug] = useState(defaultSlug);
   const [password, setPassword] = useState("");
@@ -24,7 +34,10 @@ export function PublishDialog({
     "idle" | "checking" | "available" | "taken"
   >("idle");
   const [publishing, setPublishing] = useState(false);
-  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [result, setResult] = useState<{ url: string; editKey: string } | null>(
+    null
+  );
+  const [editSaved, setEditSaved] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -32,11 +45,13 @@ export function PublishDialog({
       setPassword("");
       setSlugStatus("idle");
       setPublishing(false);
-      setPublishedUrl(null);
+      setResult(null);
+      setEditSaved(false);
     }
   }, [open, defaultSlug]);
 
   useEffect(() => {
+    if (isEditMode) return; // skip slug check in edit mode
     if (!slug || slug.length < 2) {
       setSlugStatus("idle");
       return;
@@ -58,18 +73,18 @@ export function PublishDialog({
       }
     }, 300);
     return () => clearTimeout(timeout);
-  }, [slug]);
+  }, [slug, isEditMode]);
 
   const handlePublish = async () => {
-    if (slugStatus === "taken") {
+    if (!isEditMode && slugStatus === "taken") {
       toast("slug is already taken");
       return;
     }
     setPublishing(true);
     try {
-      const url = await onPublish(slug, password);
-      if (url) {
-        setPublishedUrl(url);
+      const res = await onPublish(slug, password);
+      if (res) {
+        setResult(res);
         toast("published successfully");
       }
     } catch {
@@ -79,12 +94,167 @@ export function PublishDialog({
     }
   };
 
-  const copyUrl = () => {
-    if (publishedUrl) {
-      navigator.clipboard.writeText(publishedUrl);
-      toast("link copied");
+  const handleSaveEdit = async () => {
+    if (!onSaveEdit) return;
+    setPublishing(true);
+    try {
+      const ok = await onSaveEdit();
+      if (ok) {
+        setEditSaved(true);
+        toast("changes saved");
+      }
+    } catch {
+      toast("save failed — try again");
+    } finally {
+      setPublishing(false);
     }
   };
+
+  const copyText = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast(`${label} copied`);
+  };
+
+  const downloadEditKeyPdf = () => {
+    if (!result) return;
+    const pdf = new jsPDF({ unit: "mm", format: "a4" });
+    const w = 210;
+
+    pdf.setFont("courier", "bold");
+    pdf.setFontSize(20);
+    pdf.setTextColor(23, 23, 23);
+    pdf.text("> noteup", w / 2, 40, { align: "center" });
+
+    pdf.setFont("courier", "normal");
+    pdf.setFontSize(11);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text("edit key — keep this document safe", w / 2, 52, {
+      align: "center",
+    });
+
+    // border box
+    const bx = 25;
+    const bw = w - 50;
+    pdf.setDrawColor(200);
+    pdf.setLineWidth(0.3);
+    pdf.rect(bx, 65, bw, 80);
+
+    // fields
+    pdf.setFont("courier", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(130);
+
+    let y = 78;
+    const lx = 32;
+    const vx = 75;
+
+    pdf.text("slug", lx, y);
+    pdf.setTextColor(23);
+    pdf.text(slug, vx, y);
+
+    y += 12;
+    pdf.setTextColor(130);
+    pdf.text("url", lx, y);
+    pdf.setTextColor(23);
+    pdf.text(result.url, vx, y);
+
+    y += 12;
+    pdf.setTextColor(130);
+    pdf.text("edit key", lx, y);
+    pdf.setTextColor(23);
+    pdf.setFont("courier", "bold");
+    pdf.text(result.editKey, vx, y);
+
+    y += 12;
+    pdf.setFont("courier", "normal");
+    pdf.setTextColor(130);
+    pdf.text("encrypted", lx, y);
+    pdf.setTextColor(23);
+    pdf.text(password ? "yes" : "no", vx, y);
+
+    y += 12;
+    pdf.setTextColor(130);
+    pdf.text("created", lx, y);
+    pdf.setTextColor(23);
+    pdf.text(new Date().toISOString().split("T")[0], vx, y);
+
+    // warning
+    pdf.setFont("courier", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(180);
+    pdf.text(
+      "this edit key cannot be recovered. without it you cannot edit your note.",
+      w / 2,
+      160,
+      { align: "center" }
+    );
+    pdf.text(
+      "store this document securely.",
+      w / 2,
+      167,
+      { align: "center" }
+    );
+
+    pdf.save(`noteup-editkey-${slug}.pdf`);
+    toast("edit key pdf downloaded");
+  };
+
+  // edit mode: simple save button
+  if (isEditMode) {
+    return (
+      <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 bg-black/60 z-50" />
+          <Dialog.Popup className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100%-2rem)] max-w-lg bg-card border border-border overflow-x-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <Dialog.Title className="font-mono text-xs font-semibold uppercase tracking-wider">
+                {editSaved ? "saved" : "save changes"}
+              </Dialog.Title>
+              <Dialog.Close className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                <X className="h-3.5 w-3.5" />
+              </Dialog.Close>
+            </div>
+            <div className="p-4 space-y-4">
+              {editSaved ? (
+                <p className="font-mono text-xs text-muted-foreground">
+                  changes saved as a new version.
+                </p>
+              ) : (
+                <>
+                  <p className="font-mono text-xs text-muted-foreground">
+                    this will save a new version of the note. the previous
+                    version will remain in the history.
+                  </p>
+                  {password !== undefined && (
+                    <div className="space-y-2">
+                      <label className="font-mono text-xs text-muted-foreground flex items-center gap-1.5">
+                        <Lock className="h-3 w-3" />
+                        password (optional — re-encrypt)
+                      </label>
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="leave empty for public"
+                        className="w-full bg-transparent border border-border p-2 font-mono text-xs focus:border-foreground/30 focus:outline-none transition-colors"
+                      />
+                    </div>
+                  )}
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={publishing}
+                    className="w-full border border-border bg-foreground text-background p-2.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {publishing ? "saving..." : "save new version"}
+                  </button>
+                </>
+              )}
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+    );
+  }
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
@@ -93,19 +263,19 @@ export function PublishDialog({
         <Dialog.Popup className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100%-2rem)] max-w-lg bg-card border border-border overflow-x-hidden">
           <div className="flex items-center justify-between p-4 border-b border-border">
             <Dialog.Title className="font-mono text-xs font-semibold uppercase tracking-wider">
-              {publishedUrl ? "published" : "publish note"}
+              {result ? "published" : "publish note"}
             </Dialog.Title>
             <Dialog.Close className="p-1 text-muted-foreground hover:text-foreground transition-colors">
               <X className="h-3.5 w-3.5" />
             </Dialog.Close>
           </div>
 
-          {publishedUrl ? (
+          {result ? (
             <div className="p-4 space-y-4">
               <div className="border border-border divide-y divide-border">
                 <div className="p-3 flex justify-between font-mono text-xs">
                   <span className="text-muted-foreground">url</span>
-                  <span className="truncate ml-4">{publishedUrl}</span>
+                  <span className="truncate ml-4">{result.url}</span>
                 </div>
                 <div className="p-3 flex justify-between font-mono text-xs">
                   <span className="text-muted-foreground">encrypted</span>
@@ -113,16 +283,50 @@ export function PublishDialog({
                 </div>
               </div>
 
+              {/* edit key - critical section */}
+              <div className="border border-border p-3 space-y-2">
+                <div className="flex items-center gap-1.5 font-mono text-xs">
+                  <Key className="h-3 w-3 text-muted-foreground" />
+                  <span className="font-semibold">edit key</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-muted border border-border px-2 py-1.5 font-mono text-xs break-all select-all">
+                    {result.editKey}
+                  </code>
+                  <button
+                    onClick={() => copyText(result.editKey, "edit key")}
+                    className="border border-border p-1.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    title="copy"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={downloadEditKeyPdf}
+                    className="border border-border p-1.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    title="download as pdf"
+                  >
+                    <Download className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="flex items-start gap-1.5 font-mono text-xs text-muted-foreground">
+                  <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                  <span>
+                    save this key — it cannot be recovered. you need it to edit
+                    this note later.
+                  </span>
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <button
-                  onClick={copyUrl}
+                  onClick={() => copyText(result.url, "link")}
                   className="flex-1 border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-2"
                 >
                   <Copy className="h-3 w-3" />
                   copy link
                 </button>
                 <a
-                  href={publishedUrl}
+                  href={result.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-2"

@@ -1,5 +1,6 @@
 import { db } from "@/db";
-import { notes } from "@/db/schema";
+import { notes, noteVersions } from "@/db/schema";
+import { nanoid } from "nanoid";
 
 export type SaveNoteInput = {
   id: string;
@@ -10,6 +11,7 @@ export type SaveNoteInput = {
   salt?: string | null;
   iv?: string | null;
   encrypted: boolean;
+  editKeyHash: string;
 };
 
 export async function saveNote(input: SaveNoteInput) {
@@ -22,8 +24,24 @@ export async function saveNote(input: SaveNoteInput) {
     salt: input.salt ?? null,
     iv: input.iv ?? null,
     encrypted: input.encrypted,
+    editKeyHash: input.editKeyHash,
+    version: 1,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
+
+  // save initial version
+  await db().insert(noteVersions).values({
+    id: nanoid(12),
+    noteId: input.id,
+    version: 1,
+    title: input.title,
+    content: input.content,
+    encrypted: input.encrypted,
+    salt: input.salt ?? null,
+    iv: input.iv ?? null,
+    createdAt: new Date(),
+  });
+
   return input.id;
 }
