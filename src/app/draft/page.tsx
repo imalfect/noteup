@@ -2,14 +2,17 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { EditorView } from "@codemirror/view";
+import type { Editor } from "@tiptap/react";
 import { Title } from "@/components/title";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CodeEditor } from "@/components/editor/code-editor";
+import { TiptapEditor } from "@/components/editor/tiptap-editor";
 import { Toolbar } from "@/components/editor/toolbar";
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { PublishDialog } from "@/components/editor/publish-dialog";
 import { MathDialog } from "@/components/editor/math-dialog";
+import { CommandPalette } from "@/components/editor/command-palette";
+import { EditorContextMenu } from "@/components/editor/context-menu";
+import { SettingsDialog } from "@/components/editor/settings-dialog";
 import { encryptContent } from "@/lib/crypto";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
@@ -18,11 +21,16 @@ import {
   ArrowLeft,
   Upload,
   Sigma,
+  Eye,
+  EyeOff,
+  Settings,
+  Command,
 } from "lucide-react";
 import Link from "next/link";
 
 const DRAFT_KEY = "noteup-draft";
 const AUTOSAVE_INTERVAL = 3000;
+const UI_SCALE_KEY = "noteup-ui-scale";
 
 type Draft = {
   content: string;
@@ -44,6 +52,15 @@ function saveDraft(draft: Draft) {
   localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
 }
 
+function loadUiScale(): number {
+  if (typeof window === "undefined") return 1;
+  try {
+    const saved = localStorage.getItem(UI_SCALE_KEY);
+    if (saved) return parseFloat(saved);
+  } catch {}
+  return 1;
+}
+
 export default function DraftPage() {
   const router = useRouter();
   const [content, setContent] = useState("");
@@ -51,7 +68,10 @@ export default function DraftPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [showMathDialog, setShowMathDialog] = useState(false);
-  const [editorView, setEditorView] = useState<EditorView | null>(null);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const [uiScale, setUiScale] = useState(1);
   const lastSaveRef = useRef<number>(Date.now());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -61,7 +81,13 @@ export default function DraftPage() {
     const draft = loadDraft();
     setContent(draft.content);
     setTitle(draft.title);
+    setUiScale(loadUiScale());
   }, []);
+
+  const handleUiScaleChange = (scale: number) => {
+    setUiScale(scale);
+    localStorage.setItem(UI_SCALE_KEY, String(scale));
+  };
 
   // autosave
   useEffect(() => {
@@ -75,7 +101,6 @@ export default function DraftPage() {
     return () => clearInterval(interval);
   }, [content, title, mounted]);
 
-  // save on content change (debounced via autosave)
   useEffect(() => {
     if (!mounted) return;
     lastSaveRef.current = Date.now();
@@ -89,8 +114,25 @@ export default function DraftPage() {
     };
   }, [content, title, mounted]);
 
-  const handleViewReady = useCallback((view: EditorView) => {
-    setEditorView(view);
+  // keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowCommandPalette((v) => !v);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        saveDraft({ content, title, updatedAt: Date.now() });
+        toast("draft saved");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [content, title]);
+
+  const handleEditorReady = useCallback((ed: Editor) => {
+    setEditor(ed);
   }, []);
 
   const handlePublish = async (
@@ -132,9 +174,7 @@ export default function DraftPage() {
       return null;
     }
 
-    // clear draft after successful publish
     localStorage.removeItem(DRAFT_KEY);
-
     const origin = window.location.origin;
     return `${origin}/${slug}`;
   };
@@ -152,36 +192,26 @@ export default function DraftPage() {
     reader.readAsText(file);
   };
 
-  const handlePaste = useCallback(
-    (e: ClipboardEvent) => {
-      // allow normal paste in editor - this handles paste from outside
-    },
-    []
-  );
-
-  useEffect(() => {
-    window.addEventListener("paste", handlePaste);
-    return () => window.removeEventListener("paste", handlePaste);
-  }, [handlePaste]);
-
   const generateSlug = () => {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 40) || nanoid(8);
+    return (
+      title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 40) || nanoid(8)
+    );
   };
 
   const handleInsertMath = (latex: string, isBlock: boolean) => {
-    if (!editorView) return;
-    const { from } = editorView.state.selection.main;
+    if (!editor) return;
     const insert = isBlock ? `\n$$\n${latex}\n$$\n` : `$${latex}$`;
-    editorView.dispatch({
-      changes: { from, insert },
-      selection: { anchor: from + insert.length },
-    });
-    editorView.focus();
+    editor.chain().focus().insertContent(insert).run();
     setShowMathDialog(false);
+  };
+
+  const doSaveDraft = () => {
+    saveDraft({ content, title, updatedAt: Date.now() });
+    toast("draft saved");
   };
 
   if (!mounted) {
@@ -195,7 +225,10 @@ export default function DraftPage() {
   }
 
   return (
-    <div className="h-dvh flex flex-col">
+    <div
+      className="h-dvh flex flex-col"
+      style={{ fontSize: `${uiScale * 100}%` }}
+    >
       {/* header */}
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <Link
@@ -218,6 +251,14 @@ export default function DraftPage() {
         />
 
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowCommandPalette(true)}
+            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            title="command palette (ctrl+k)"
+          >
+            <Command className="h-3.5 w-3.5" />
+          </button>
+
           <button
             onClick={() => setShowMathDialog(true)}
             className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
@@ -242,14 +283,33 @@ export default function DraftPage() {
           />
 
           <button
-            onClick={() => {
-              saveDraft({ content, title, updatedAt: Date.now() });
-              toast("draft saved");
-            }}
+            onClick={doSaveDraft}
             className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-            title="save draft"
+            title="save draft (ctrl+s)"
           >
             <Save className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            onClick={() => setShowPreview(!showPreview)}
+            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            title={
+              showPreview ? "hide markdown preview" : "show markdown preview"
+            }
+          >
+            {showPreview ? (
+              <EyeOff className="h-3.5 w-3.5" />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setShowSettings(true)}
+            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            title="settings"
+          >
+            <Settings className="h-3.5 w-3.5" />
           </button>
 
           <ThemeToggle />
@@ -265,21 +325,19 @@ export default function DraftPage() {
 
       {/* toolbar */}
       <Toolbar
-        editorView={editorView}
-        showPreview={showPreview}
-        onTogglePreview={() => setShowPreview(!showPreview)}
+        editor={editor}
         onExportPdf={() => router.push(`/export?draft=true`)}
       />
 
-      {/* editor + preview */}
+      {/* editor + optional markdown preview */}
       <div className="flex-1 flex overflow-hidden">
         <div
           className={`${showPreview ? "w-1/2 border-r border-border" : "w-full"} flex flex-col overflow-hidden`}
         >
-          <CodeEditor
-            value={content}
+          <TiptapEditor
+            content={content}
             onChange={setContent}
-            onViewReady={handleViewReady}
+            onEditorReady={handleEditorReady}
           />
         </div>
 
@@ -296,8 +354,34 @@ export default function DraftPage() {
         <span>{content.split(/\s+/).filter(Boolean).length} words</span>
         <span>{content.split("\n").length} lines</span>
         <span className="flex-1" />
+        <span>ctrl+k command palette</span>
         <span>draft · auto-saved</span>
       </div>
+
+      {/* context menu */}
+      <EditorContextMenu editor={editor} />
+
+      {/* command palette */}
+      <CommandPalette
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        editor={editor}
+        onExportPdf={() => router.push(`/export?draft=true`)}
+        onOpenMath={() => setShowMathDialog(true)}
+        onImport={() => fileInputRef.current?.click()}
+        onSaveDraft={doSaveDraft}
+        onTogglePreview={() => setShowPreview(!showPreview)}
+        onPublish={() => setShowPublish(true)}
+        onOpenSettings={() => setShowSettings(true)}
+      />
+
+      {/* settings dialog */}
+      <SettingsDialog
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        uiScale={uiScale}
+        onUiScaleChange={handleUiScaleChange}
+      />
 
       {/* publish dialog */}
       <PublishDialog

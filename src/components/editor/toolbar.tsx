@@ -15,142 +15,139 @@ import {
   Heading3,
   CheckSquare,
   Table,
-  Sigma,
-  Eye,
-  EyeOff,
   FileDown,
+  Undo2,
+  Redo2,
+  CodeSquare,
 } from "lucide-react";
-import type { EditorView } from "@codemirror/view";
+import type { Editor } from "@tiptap/react";
 
 type ToolbarProps = {
-  editorView: EditorView | null;
-  showPreview: boolean;
-  onTogglePreview: () => void;
+  editor: Editor | null;
   onExportPdf: () => void;
 };
 
-function insertWrap(view: EditorView, before: string, after: string) {
-  const { from, to } = view.state.selection.main;
-  const selected = view.state.sliceDoc(from, to);
-  view.dispatch({
-    changes: { from, to, insert: `${before}${selected || "text"}${after}` },
-    selection: {
-      anchor: from + before.length,
-      head: from + before.length + (selected?.length || 4),
-    },
-  });
-  view.focus();
-}
+type ToolItem =
+  | "sep"
+  | {
+      icon: React.ComponentType<{ className?: string }>;
+      title: string;
+      action: (e: Editor) => void;
+      isActive?: (e: Editor) => boolean;
+    };
 
-function insertLine(view: EditorView, prefix: string) {
-  const { from } = view.state.selection.main;
-  const line = view.state.doc.lineAt(from);
-  view.dispatch({
-    changes: { from: line.from, to: line.from, insert: prefix },
-  });
-  view.focus();
-}
-
-function insertBlock(view: EditorView, text: string) {
-  const { from } = view.state.selection.main;
-  view.dispatch({
-    changes: { from, insert: text },
-    selection: { anchor: from + text.length },
-  });
-  view.focus();
-}
-
-const tools = [
+const tools: ToolItem[] = [
+  {
+    icon: Undo2,
+    title: "undo",
+    action: (e) => e.chain().focus().undo().run(),
+  },
+  {
+    icon: Redo2,
+    title: "redo",
+    action: (e) => e.chain().focus().redo().run(),
+  },
+  "sep",
   {
     icon: Bold,
     title: "bold",
-    action: (v: EditorView) => insertWrap(v, "**", "**"),
+    action: (e) => e.chain().focus().toggleBold().run(),
+    isActive: (e) => e.isActive("bold"),
   },
   {
     icon: Italic,
     title: "italic",
-    action: (v: EditorView) => insertWrap(v, "_", "_"),
+    action: (e) => e.chain().focus().toggleItalic().run(),
+    isActive: (e) => e.isActive("italic"),
   },
   {
     icon: Strikethrough,
     title: "strikethrough",
-    action: (v: EditorView) => insertWrap(v, "~~", "~~"),
+    action: (e) => e.chain().focus().toggleStrike().run(),
+    isActive: (e) => e.isActive("strike"),
   },
   {
     icon: Code,
     title: "inline code",
-    action: (v: EditorView) => insertWrap(v, "`", "`"),
+    action: (e) => e.chain().focus().toggleCode().run(),
+    isActive: (e) => e.isActive("code"),
   },
-  "sep" as const,
+  "sep",
   {
     icon: Heading1,
     title: "heading 1",
-    action: (v: EditorView) => insertLine(v, "# "),
+    action: (e) => e.chain().focus().toggleHeading({ level: 1 }).run(),
+    isActive: (e) => e.isActive("heading", { level: 1 }),
   },
   {
     icon: Heading2,
     title: "heading 2",
-    action: (v: EditorView) => insertLine(v, "## "),
+    action: (e) => e.chain().focus().toggleHeading({ level: 2 }).run(),
+    isActive: (e) => e.isActive("heading", { level: 2 }),
   },
   {
     icon: Heading3,
     title: "heading 3",
-    action: (v: EditorView) => insertLine(v, "### "),
+    action: (e) => e.chain().focus().toggleHeading({ level: 3 }).run(),
+    isActive: (e) => e.isActive("heading", { level: 3 }),
   },
-  "sep" as const,
+  "sep",
   {
     icon: List,
     title: "bullet list",
-    action: (v: EditorView) => insertLine(v, "- "),
+    action: (e) => e.chain().focus().toggleBulletList().run(),
+    isActive: (e) => e.isActive("bulletList"),
   },
   {
     icon: ListOrdered,
-    title: "numbered list",
-    action: (v: EditorView) => insertLine(v, "1. "),
+    title: "ordered list",
+    action: (e) => e.chain().focus().toggleOrderedList().run(),
+    isActive: (e) => e.isActive("orderedList"),
   },
   {
     icon: CheckSquare,
     title: "task list",
-    action: (v: EditorView) => insertLine(v, "- [ ] "),
+    action: (e) => e.chain().focus().toggleTaskList().run(),
+    isActive: (e) => e.isActive("taskList"),
   },
-  "sep" as const,
+  "sep",
   {
     icon: Quote,
     title: "blockquote",
-    action: (v: EditorView) => insertLine(v, "> "),
+    action: (e) => e.chain().focus().toggleBlockquote().run(),
+    isActive: (e) => e.isActive("blockquote"),
+  },
+  {
+    icon: CodeSquare,
+    title: "code block",
+    action: (e) => e.chain().focus().toggleCodeBlock().run(),
+    isActive: (e) => e.isActive("codeBlock"),
   },
   {
     icon: Minus,
     title: "horizontal rule",
-    action: (v: EditorView) => insertBlock(v, "\n---\n"),
+    action: (e) => e.chain().focus().setHorizontalRule().run(),
   },
   {
     icon: Link2,
     title: "link",
-    action: (v: EditorView) => insertWrap(v, "[", "](url)"),
+    action: (e) => {
+      const url = window.prompt("url:");
+      if (url) {
+        e.chain().focus().setLink({ href: url }).run();
+      }
+    },
+    isActive: (e) => e.isActive("link"),
   },
   {
     icon: Table,
     title: "table",
-    action: (v: EditorView) =>
-      insertBlock(
-        v,
-        "\n| header | header |\n| ------ | ------ |\n| cell   | cell   |\n"
-      ),
-  },
-  {
-    icon: Sigma,
-    title: "math block",
-    action: (v: EditorView) => insertBlock(v, "\n$$\nE = mc^2\n$$\n"),
+    action: (e) =>
+      e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
   },
 ];
 
-export function Toolbar({
-  editorView,
-  showPreview,
-  onTogglePreview,
-  onExportPdf,
-}: ToolbarProps) {
+export function Toolbar({ editor, onExportPdf }: ToolbarProps) {
   return (
     <div className="flex items-center gap-0.5 border-b border-border px-2 py-1.5 overflow-x-auto">
       {tools.map((tool, i) =>
@@ -160,8 +157,12 @@ export function Toolbar({
           <button
             key={i}
             title={tool.title}
-            onClick={() => editorView && tool.action(editorView)}
-            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => editor && tool.action(editor)}
+            className={`p-1.5 transition-colors ${
+              editor && tool.isActive?.(editor)
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
           >
             <tool.icon className="h-3.5 w-3.5" />
           </button>
@@ -176,18 +177,6 @@ export function Toolbar({
         className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
       >
         <FileDown className="h-3.5 w-3.5" />
-      </button>
-
-      <button
-        title={showPreview ? "hide preview" : "show preview"}
-        onClick={onTogglePreview}
-        className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {showPreview ? (
-          <EyeOff className="h-3.5 w-3.5" />
-        ) : (
-          <Eye className="h-3.5 w-3.5" />
-        )}
       </button>
     </div>
   );

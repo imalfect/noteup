@@ -95,34 +95,192 @@ body {
   font-family: var(--font-sans);
 }
 
-/* codemirror overrides for our theme */
-.cm-editor {
-  font-family: var(--font-mono) !important;
-  background: transparent !important;
-}
-
-.cm-editor .cm-content {
-  font-family: var(--font-mono) !important;
+/* tiptap editor styles */
+.tiptap-editor {
+  font-family: var(--font-mono);
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
+  color: var(--foreground);
 }
 
-.cm-editor .cm-gutters {
-  background: transparent !important;
-  border-right: 1px solid var(--border) !important;
+.tiptap-editor:focus {
+  outline: none;
 }
 
-.cm-editor .cm-activeLineGutter,
-.cm-editor .cm-activeLine {
-  background: var(--muted) !important;
+.tiptap-editor > *:first-child {
+  margin-top: 0;
 }
 
-.cm-editor.cm-focused {
-  outline: none !important;
+.tiptap-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted-foreground);
+  pointer-events: none;
+  height: 0;
 }
 
-.cm-editor .cm-cursor {
-  border-left-color: var(--foreground) !important;
+.tiptap-editor h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 1.5rem 0 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tiptap-editor h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.tiptap-editor h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+}
+
+.tiptap-editor h4,
+.tiptap-editor h5,
+.tiptap-editor h6 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.tiptap-editor p {
+  margin: 0.5rem 0;
+}
+
+.tiptap-editor a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tiptap-editor blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 1rem;
+  color: var(--muted-foreground);
+  margin: 0.75rem 0;
+}
+
+.tiptap-editor pre {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.tiptap-editor code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+.tiptap-editor :not(pre) > code {
+  background: var(--muted);
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--border);
+}
+
+.tiptap-editor ul,
+.tiptap-editor ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.tiptap-editor ul {
+  list-style-type: disc;
+}
+
+.tiptap-editor ol {
+  list-style-type: decimal;
+}
+
+.tiptap-editor li {
+  margin: 0.15rem 0;
+}
+
+.tiptap-editor li p {
+  margin: 0;
+}
+
+.tiptap-editor hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.tiptap-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  font-size: 12px;
+}
+
+.tiptap-editor th,
+.tiptap-editor td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  min-width: 40px;
+}
+
+.tiptap-editor th {
+  font-weight: 600;
+  background: var(--muted);
+}
+
+.tiptap-editor .selectedCell {
+  background: var(--accent);
+}
+
+/* task list */
+.tiptap-editor ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.tiptap-editor ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.tiptap-editor ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.tiptap-editor ul[data-type="taskList"] li > label input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+}
+
+.tiptap-editor ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
+  background: var(--foreground);
+  border-color: var(--foreground);
+}
+
+.tiptap-editor ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 5px;
+  height: 9px;
+  border: solid var(--background);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.tiptap-editor ul[data-type="taskList"] li > div {
+  flex: 1;
 }
 
 /* markdown preview styles */

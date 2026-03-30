@@ -23,13 +23,59 @@ const PAGE_SIZES: Record<
   a5: { width: 148, height: 210, label: "a5 (148 x 210mm)" },
 };
 
-const FONTS = [
-  { value: "mono", label: "monospace" },
-  { value: "sans", label: "sans-serif" },
-  { value: "serif", label: "serif" },
+const FONT_OPTIONS = [
+  {
+    value: "mono",
+    label: "monospace",
+    css: '"Courier New", "Courier", monospace',
+  },
+  {
+    value: "sans",
+    label: "sans-serif",
+    css: '"Helvetica", "Arial", sans-serif',
+  },
+  {
+    value: "serif",
+    label: "serif",
+    css: '"Georgia", "Times New Roman", serif',
+  },
 ];
 
 const DRAFT_KEY = "noteup-draft";
+
+function Checkbox({
+  checked,
+  onChange,
+  children,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex items-center gap-2 font-mono text-xs cursor-pointer">
+      <button
+        onClick={onChange}
+        className={`w-4 h-4 border flex items-center justify-center transition-colors ${
+          checked ? "bg-foreground border-foreground" : "border-border"
+        }`}
+      >
+        {checked && (
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3 w-3 text-background"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={3}
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+      </button>
+      {children}
+    </label>
+  );
+}
 
 export function ExportPageContent() {
   const searchParams = useSearchParams();
@@ -45,6 +91,7 @@ export function ExportPageContent() {
   const [fontFamily, setFontFamily] = useState("mono");
   const [darkMode, setDarkMode] = useState(false);
   const [showPageNumbers, setShowPageNumbers] = useState(true);
+  const [showTitle, setShowTitle] = useState(true);
   const [lineHeight, setLineHeight] = useState(1.6);
 
   const previewRef = useRef<HTMLDivElement>(null);
@@ -85,12 +132,15 @@ export function ExportPageContent() {
   const pageHeightPx = mmToPx(effectiveHeight);
   const marginPx = mmToPx(marginMm);
 
-  const fontFamilyCSS =
-    fontFamily === "mono"
-      ? "var(--font-mono)"
-      : fontFamily === "serif"
-        ? "Georgia, serif"
-        : "var(--font-sans)";
+  const fontObj = FONT_OPTIONS.find((f) => f.value === fontFamily)!;
+  const fontFamilyCSS = fontObj.css;
+
+  // self-contained colors — independent of app theme
+  const bgColor = darkMode ? "#080808" : "#ffffff";
+  const fgColor = darkMode ? "#ededed" : "#171717";
+  const mutedColor = darkMode ? "#808080" : "#808080";
+  const borderColor = darkMode ? "#333333" : "#dddddd";
+  const codeBgColor = darkMode ? "#111111" : "#f5f5f5";
 
   const handleExport = useCallback(async () => {
     if (!previewRef.current) return;
@@ -256,7 +306,7 @@ export function ExportPageContent() {
               onChange={(e) => setFontFamily(e.target.value)}
               className="w-full bg-transparent border border-border p-2 font-mono text-xs focus:border-foreground/30 focus:outline-none"
             >
-              {FONTS.map((f) => (
+              {FONT_OPTIONS.map((f) => (
                 <option key={f.value} value={f.value}>
                   {f.label}
                 </option>
@@ -327,56 +377,23 @@ export function ExportPageContent() {
             options
           </h3>
 
-          <label className="flex items-center gap-2 font-mono text-xs cursor-pointer">
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className={`w-4 h-4 border flex items-center justify-center transition-colors ${
-                darkMode
-                  ? "bg-foreground border-foreground"
-                  : "border-border"
-              }`}
-            >
-              {darkMode && (
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-3 w-3 text-background"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={3}
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              )}
-            </button>
-            dark background
-          </label>
+          <Checkbox checked={showTitle} onChange={() => setShowTitle(!showTitle)}>
+            show document title
+          </Checkbox>
 
-          <label className="flex items-center gap-2 font-mono text-xs cursor-pointer">
-            <button
-              onClick={() => setShowPageNumbers(!showPageNumbers)}
-              className={`w-4 h-4 border flex items-center justify-center transition-colors ${
-                showPageNumbers
-                  ? "bg-foreground border-foreground"
-                  : "border-border"
-              }`}
-            >
-              {showPageNumbers && (
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-3 w-3 text-background"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={3}
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              )}
-            </button>
+          <Checkbox checked={darkMode} onChange={() => setDarkMode(!darkMode)}>
+            dark background
+          </Checkbox>
+
+          <Checkbox
+            checked={showPageNumbers}
+            onChange={() => setShowPageNumbers(!showPageNumbers)}
+          >
             page numbers
-          </label>
+          </Checkbox>
         </div>
 
-        {/* preview */}
+        {/* preview — fully self-contained, no CSS variable colors */}
         <div className="flex-1 overflow-auto bg-muted p-8 flex justify-center">
           <div
             ref={previewRef}
@@ -385,33 +402,97 @@ export function ExportPageContent() {
               transformOrigin: "top center",
             }}
           >
+            {/*
+              data-pdf-content: all colors are hardcoded inline so the
+              preview is completely independent of the app's light/dark theme.
+              The font-family is set via inline style on this element AND
+              inherited by all children (no CSS variable indirection).
+            */}
             <div
               data-pdf-content
               style={{
                 width: `${pageWidthPx}px`,
                 minHeight: `${pageHeightPx}px`,
                 padding: `${marginPx}px`,
-                backgroundColor: darkMode ? "#080808" : "#ffffff",
-                color: darkMode ? "#ededed" : "#171717",
+                backgroundColor: bgColor,
+                color: fgColor,
                 fontFamily: fontFamilyCSS,
                 fontSize: `${fontSize}px`,
                 lineHeight: lineHeight,
-                boxShadow: "0 0 0 1px var(--border)",
+                boxShadow: "0 0 0 1px #333",
               }}
-              className="markdown-preview"
             >
-              <h1
-                style={{
-                  fontSize: `${fontSize * 1.5}px`,
-                  fontWeight: 700,
-                  marginBottom: `${fontSize}px`,
-                  paddingBottom: `${fontSize * 0.5}px`,
-                  borderBottom: `1px solid ${darkMode ? "#333" : "#ddd"}`,
-                }}
-              >
-                {title}
-              </h1>
-              <MarkdownPreview content={content} />
+              {/* override markdown-preview to use inline colors */}
+              <style>{`
+                [data-pdf-content] * {
+                  font-family: inherit !important;
+                  color: inherit !important;
+                }
+                [data-pdf-content] h1,
+                [data-pdf-content] h2,
+                [data-pdf-content] h3,
+                [data-pdf-content] h4,
+                [data-pdf-content] h5,
+                [data-pdf-content] h6 {
+                  color: ${fgColor} !important;
+                }
+                [data-pdf-content] a {
+                  text-decoration: underline;
+                  text-underline-offset: 2px;
+                }
+                [data-pdf-content] blockquote {
+                  border-left: 2px solid ${borderColor};
+                  padding-left: 1rem;
+                  color: ${mutedColor} !important;
+                  margin: 0.75rem 0;
+                }
+                [data-pdf-content] blockquote * {
+                  color: ${mutedColor} !important;
+                }
+                [data-pdf-content] pre {
+                  background: ${codeBgColor} !important;
+                  border: 1px solid ${borderColor};
+                  padding: 0.75rem;
+                  overflow-x: auto;
+                  margin: 0.75rem 0;
+                }
+                [data-pdf-content] :not(pre) > code {
+                  background: ${codeBgColor} !important;
+                  padding: 0.15rem 0.3rem;
+                  border: 1px solid ${borderColor};
+                }
+                [data-pdf-content] th {
+                  background: ${codeBgColor} !important;
+                }
+                [data-pdf-content] th,
+                [data-pdf-content] td {
+                  border-color: ${borderColor} !important;
+                }
+                [data-pdf-content] hr {
+                  border-color: ${borderColor} !important;
+                }
+                [data-pdf-content] .katex * {
+                  color: ${fgColor} !important;
+                }
+              `}</style>
+
+              {showTitle && (
+                <h1
+                  style={{
+                    fontSize: `${fontSize * 1.5}px`,
+                    fontWeight: 700,
+                    marginBottom: `${fontSize}px`,
+                    paddingBottom: `${fontSize * 0.5}px`,
+                    borderBottom: `1px solid ${borderColor}`,
+                    color: fgColor,
+                  }}
+                >
+                  {title}
+                </h1>
+              )}
+              <div className="markdown-preview">
+                <MarkdownPreview content={content} />
+              </div>
             </div>
           </div>
         </div>
