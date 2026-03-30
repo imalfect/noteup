@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { MarkdownPreview } from "@/components/markdown-preview";
+import { useState, useEffect, useMemo } from "react";
 import { Title } from "@/components/title";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { toast } from "sonner";
@@ -12,14 +11,11 @@ import { useSearchParams } from "next/navigation";
 type PageSize = "a4" | "letter" | "a3" | "a5";
 type Orientation = "portrait" | "landscape";
 
-const PAGE_SIZES: Record<
-  PageSize,
-  { width: number; height: number; label: string }
-> = {
-  a4: { width: 210, height: 297, label: "a4 (210 x 297mm)" },
-  letter: { width: 216, height: 279, label: "letter (216 x 279mm)" },
-  a3: { width: 297, height: 420, label: "a3 (297 x 420mm)" },
-  a5: { width: 148, height: 210, label: "a5 (148 x 210mm)" },
+const PAGE_SIZE_LABELS: Record<PageSize, string> = {
+  A4: "a4 (210 x 297mm)",
+  LETTER: "letter (216 x 279mm)",
+  A3: "a3 (297 x 420mm)",
+  A5: "a5 (148 x 210mm)",
 };
 
 const FONT_OPTIONS = [
@@ -82,14 +78,15 @@ export function ExportPageContent() {
   const [mounted, setMounted] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const [pageSize, setPageSize] = useState<PageSize>("a4");
+  const [pageSize, setPageSize] = useState<PageSize>("A4");
   const [orientation, setOrientation] = useState<Orientation>("portrait");
-  const [fontSize, setFontSize] = useState(12);
+  const [fontSize, setFontSize] = useState(11);
   const [marginMm, setMarginMm] = useState(20);
   const [fontFamily, setFontFamily] = useState("jetbrains-mono");
   const [darkMode, setDarkMode] = useState(false);
   const [showPageNumbers, setShowPageNumbers] = useState(true);
   const [showTitle, setShowTitle] = useState(true);
+  const [keepSectionsTogether, setKeepSectionsTogether] = useState(true);
   const [lineHeight, setLineHeight] = useState(1.6);
 
   // for measuring content and paginating
@@ -98,6 +95,7 @@ export function ExportPageContent() {
   const [measuredHeight, setMeasuredHeight] = useState(0);
 
   useEffect(() => {
+    registerFonts();
     setMounted(true);
     try {
       const fromSession = sessionStorage.getItem("noteup-export");
@@ -370,7 +368,7 @@ export function ExportPageContent() {
         </button>
       </div>
 
-      {/* main: config sidebar + preview */}
+      {/* main: config sidebar + live preview */}
       <div className="flex-1 flex overflow-hidden">
         {/* config panel */}
         <div className="w-64 border-r border-border overflow-y-auto p-4 space-y-4 shrink-0">
@@ -387,9 +385,9 @@ export function ExportPageContent() {
               onChange={(e) => setPageSize(e.target.value as PageSize)}
               className="w-full bg-transparent border border-border p-2 font-mono text-xs focus:border-foreground/30 focus:outline-none"
             >
-              {Object.entries(PAGE_SIZES).map(([key, val]) => (
+              {Object.entries(PAGE_SIZE_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>
-                  {val.label}
+                  {label}
                 </option>
               ))}
             </select>
@@ -435,7 +433,7 @@ export function ExportPageContent() {
             </label>
             <select
               value={fontFamily}
-              onChange={(e) => setFontFamily(e.target.value)}
+              onChange={(e) => setFontFamily(e.target.value as PdfFontFamily)}
               className="w-full bg-transparent border border-border p-2 font-mono text-xs focus:border-foreground/30 focus:outline-none"
             >
               {["monospace", "sans-serif", "serif"].map((group) => (
@@ -452,25 +450,25 @@ export function ExportPageContent() {
 
           <div className="space-y-1.5">
             <label className="font-mono text-xs text-muted-foreground">
-              font size: {fontSize}px
+              font size: {fontSize}pt
             </label>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setFontSize(Math.max(8, fontSize - 1))}
+                onClick={() => setFontSize(Math.max(6, fontSize - 1))}
                 className="border border-border p-1 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Minus className="h-3 w-3" />
               </button>
               <input
                 type="range"
-                min={8}
-                max={24}
+                min={6}
+                max={20}
                 value={fontSize}
                 onChange={(e) => setFontSize(Number(e.target.value))}
                 className="flex-1"
               />
               <button
-                onClick={() => setFontSize(Math.min(24, fontSize + 1))}
+                onClick={() => setFontSize(Math.min(20, fontSize + 1))}
                 className="border border-border p-1 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Plus className="h-3 w-3" />
@@ -527,7 +525,6 @@ export function ExportPageContent() {
           >
             page numbers
           </Checkbox>
-        </div>
 
         {/* live preview: paginated page cards */}
         <div className="flex-1 overflow-auto bg-muted p-8">
