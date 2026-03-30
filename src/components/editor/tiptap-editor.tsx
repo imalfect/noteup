@@ -30,6 +30,7 @@ export function TiptapEditor({
   const isSettingContent = useRef(false);
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         codeBlock: false,
