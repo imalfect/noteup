@@ -1,0 +1,273 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+
+:root {
+  --radius: 0px;
+
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(0 0% 7%);
+  --card: hsl(0 0% 97%);
+  --card-foreground: hsl(0 0% 7%);
+  --popover: hsl(0 0% 97%);
+  --popover-foreground: hsl(0 0% 7%);
+  --primary: hsl(0 0% 7%);
+  --primary-foreground: hsl(0 0% 97%);
+  --secondary: hsl(0 0% 93%);
+  --secondary-foreground: hsl(0 0% 7%);
+  --muted: hsl(0 0% 93%);
+  --muted-foreground: hsl(0 0% 50%);
+  --accent: hsl(0 0% 93%);
+  --accent-foreground: hsl(0 0% 7%);
+  --destructive: hsl(0 70% 50%);
+  --destructive-foreground: hsl(0 0% 97%);
+  --border: hsl(0 0% 86%);
+  --input: hsl(0 0% 86%);
+  --ring: hsl(0 0% 7%);
+}
+
+.dark {
+  --background: hsl(0 0% 3%);
+  --foreground: hsl(0 0% 93%);
+  --card: hsl(0 0% 5%);
+  --card-foreground: hsl(0 0% 93%);
+  --popover: hsl(0 0% 5%);
+  --popover-foreground: hsl(0 0% 93%);
+  --primary: hsl(0 0% 93%);
+  --primary-foreground: hsl(0 0% 3%);
+  --secondary: hsl(0 0% 10%);
+  --secondary-foreground: hsl(0 0% 93%);
+  --muted: hsl(0 0% 10%);
+  --muted-foreground: hsl(0 0% 50%);
+  --accent: hsl(0 0% 10%);
+  --accent-foreground: hsl(0 0% 93%);
+  --destructive: hsl(0 70% 50%);
+  --destructive-foreground: hsl(0 0% 93%);
+  --border: hsl(0 0% 14%);
+  --input: hsl(0 0% 14%);
+  --ring: hsl(0 0% 93%);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-geist-sans), "Inter", "Fig Tree", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Fira Code", "SF Mono", ui-monospace, monospace;
+
+  --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-blink: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* codemirror overrides for our theme */
+.cm-editor {
+  font-family: var(--font-mono) !important;
+  background: transparent !important;
+}
+
+.cm-editor .cm-content {
+  font-family: var(--font-mono) !important;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.cm-editor .cm-gutters {
+  background: transparent !important;
+  border-right: 1px solid var(--border) !important;
+}
+
+.cm-editor .cm-activeLineGutter,
+.cm-editor .cm-activeLine {
+  background: var(--muted) !important;
+}
+
+.cm-editor.cm-focused {
+  outline: none !important;
+}
+
+.cm-editor .cm-cursor {
+  border-left-color: var(--foreground) !important;
+}
+
+/* markdown preview styles */
+.markdown-preview {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--foreground);
+}
+
+.markdown-preview h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 1.5rem 0 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.markdown-preview h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.markdown-preview h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+}
+
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.markdown-preview p {
+  margin: 0.5rem 0;
+}
+
+.markdown-preview a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-preview a:hover {
+  color: var(--muted-foreground);
+}
+
+.markdown-preview blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 1rem;
+  color: var(--muted-foreground);
+  margin: 0.75rem 0;
+}
+
+.markdown-preview pre {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+  font-size: 12px;
+}
+
+.markdown-preview code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+.markdown-preview :not(pre) > code {
+  background: var(--muted);
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--border);
+}
+
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.markdown-preview ul {
+  list-style-type: disc;
+}
+
+.markdown-preview ol {
+  list-style-type: decimal;
+}
+
+.markdown-preview li {
+  margin: 0.15rem 0;
+}
+
+.markdown-preview hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.markdown-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  font-size: 12px;
+}
+
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
+
+.markdown-preview th {
+  font-weight: 600;
+  background: var(--muted);
+}
+
+.markdown-preview img {
+  max-width: 100%;
+}
+
+.markdown-preview input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+/* katex overrides */
+.katex {
+  font-size: 1em !important;
+}
+
+.katex-display {
+  margin: 0.75rem 0 !important;
+  overflow-x: auto;
+}
+
+/* highlight.js theme override for dark */
+.dark .hljs {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+}
+
+.hljs {
+  background: var(--card) !important;
+}
