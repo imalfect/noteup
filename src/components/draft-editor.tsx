@@ -31,6 +31,8 @@ import {
 import Link from "next/link";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Dialog } from "@base-ui/react/dialog";
+import { MobileDrawer } from "@/components/ui/mobile-drawer";
+import { Menu } from "lucide-react";
 
 const DRAFT_KEY = "noteup-draft";
 const AUTOSAVE_INTERVAL = 3000;
@@ -91,6 +93,8 @@ export function DraftEditor() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [uiScale, setUiScale] = useState(1);
   const [editorFont, setEditorFont] = useState("");
   const [currentVersion, setCurrentVersion] = useState<number | null>(null);
@@ -366,7 +370,7 @@ export function DraftEditor() {
       }}
     >
       {/* header */}
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+      <div className="flex items-center gap-1 sm:gap-2 border-b border-border px-2 sm:px-3 py-2">
         <Link
           href="/"
           className="p-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -374,10 +378,10 @@ export function DraftEditor() {
           <ArrowLeft className="h-3.5 w-3.5" />
         </Link>
 
-        <Title />
+        <span className="hidden sm:inline-flex"><Title /></span>
 
         {isEditMode && (
-          <span className="font-mono text-xs text-muted-foreground ml-1">
+          <span className="font-mono text-xs text-muted-foreground ml-1 hidden md:inline">
             / editing{" "}
             <span className="text-foreground">{editSlug}</span>
             {currentVersion && (
@@ -386,7 +390,7 @@ export function DraftEditor() {
           </span>
         )}
 
-        <div className="w-px h-4 bg-border mx-1" />
+        <div className="w-px h-4 bg-border mx-0.5 sm:mx-1 hidden sm:block" />
 
         <input
           type="text"
@@ -396,7 +400,8 @@ export function DraftEditor() {
           placeholder="untitled"
         />
 
-        <div className="flex items-center gap-1">
+        {/* desktop actions */}
+        <div className="hidden md:flex items-center gap-1">
           {!isEditMode && (
             <Tooltip content="new note">
               <button
@@ -447,13 +452,6 @@ export function DraftEditor() {
                   <Upload className="h-3.5 w-3.5" />
                 </button>
               </Tooltip>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".md,.markdown,.txt"
-                onChange={handleImport}
-                className="hidden"
-              />
 
               <Tooltip content="save draft (ctrl+s)">
                 <button
@@ -489,27 +487,60 @@ export function DraftEditor() {
           </Tooltip>
 
           <ThemeToggle />
-
-          {justPublished && !isEditMode ? (
-            <Tooltip content="edit the published note">
-              <button
-                onClick={() => {
-                  router.push(`/draft?edit=${justPublished.slug}&key=${justPublished.editKey}`);
-                }}
-                className="ml-2 border border-border bg-foreground text-background px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors"
-              >
-                edit published
-              </button>
-            </Tooltip>
-          ) : (
-            <button
-              onClick={() => setShowPublish(true)}
-              className="ml-2 border border-border bg-foreground text-background px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors"
-            >
-              {isEditMode ? "save changes" : "publish"}
-            </button>
-          )}
         </div>
+
+        {/* mobile: preview + menu buttons */}
+        <div className="flex md:hidden items-center gap-0.5">
+          <button
+            onClick={() => setShowMobilePreview(!showMobilePreview)}
+            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showMobilePreview ? (
+              <EyeOff className="h-3.5 w-3.5" />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <button
+            onClick={() => setShowMobileMenu(true)}
+            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Menu className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".md,.markdown,.txt"
+          onChange={handleImport}
+          className="hidden"
+        />
+
+        {justPublished && !isEditMode ? (
+          <Tooltip content="edit the published note">
+            <button
+              onClick={() => {
+                router.push(`/draft?edit=${justPublished.slug}&key=${justPublished.editKey}`);
+              }}
+              className="ml-1 sm:ml-2 border border-border bg-foreground text-background px-2 sm:px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors whitespace-nowrap"
+            >
+              <span className="hidden sm:inline">edit published</span>
+              <span className="sm:hidden">edit</span>
+            </button>
+          </Tooltip>
+        ) : (
+          <button
+            onClick={() => setShowPublish(true)}
+            className="ml-1 sm:ml-2 border border-border bg-foreground text-background px-2 sm:px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors whitespace-nowrap"
+          >
+            {isEditMode ? (
+              <><span className="hidden sm:inline">save changes</span><span className="sm:hidden">save</span></>
+            ) : (
+              "publish"
+            )}
+          </button>
+        )}
       </div>
 
       {/* toolbar */}
@@ -518,10 +549,10 @@ export function DraftEditor() {
         onExportPdf={handleExportPdf}
       />
 
-      {/* editor + optional markdown preview */}
+      {/* editor + optional desktop markdown preview */}
       <div className="flex-1 flex overflow-hidden">
         <div
-          className={`${showPreview ? "w-1/2 border-r border-border" : "w-full"} flex flex-col overflow-hidden`}
+          className={`${showPreview ? "hidden md:flex md:w-1/2 md:border-r md:border-border" : "w-full"} flex flex-col overflow-hidden`}
         >
           <MarkdownCodeEditor
             ref={codeEditorRef}
@@ -530,26 +561,134 @@ export function DraftEditor() {
           />
         </div>
         {showPreview && (
-          <div
-            className="w-1/2 overflow-auto p-4"
-            style={{
-              fontFamily: editorFont || "var(--font-mono), 'Fira Code', 'SF Mono', ui-monospace, monospace",
-            }}
-          >
-            <MarkdownPreview content={content} />
-          </div>
+          <>
+            {/* desktop: side-by-side */}
+            <div
+              className="hidden md:block w-1/2 overflow-auto p-4"
+              style={{
+                fontFamily: editorFont || "var(--font-mono), 'Fira Code', 'SF Mono', ui-monospace, monospace",
+              }}
+            >
+              <MarkdownPreview content={content} />
+            </div>
+            {/* mobile: replaces editor */}
+            <div
+              className="md:hidden w-full overflow-auto p-4"
+              style={{
+                fontFamily: editorFont || "var(--font-mono), 'Fira Code', 'SF Mono', ui-monospace, monospace",
+              }}
+            >
+              <MarkdownPreview content={content} />
+            </div>
+          </>
         )}
       </div>
 
+      {/* mobile preview drawer */}
+      <MobileDrawer
+        open={showMobilePreview}
+        onClose={() => setShowMobilePreview(false)}
+        title="preview"
+      >
+        <div
+          className="p-4"
+          style={{
+            fontFamily: editorFont || "var(--font-mono), 'Fira Code', 'SF Mono', ui-monospace, monospace",
+          }}
+        >
+          <MarkdownPreview content={content} />
+        </div>
+      </MobileDrawer>
+
+      {/* mobile menu drawer */}
+      <MobileDrawer
+        open={showMobileMenu}
+        onClose={() => setShowMobileMenu(false)}
+        title="actions"
+      >
+        <div className="p-3 space-y-1">
+          {!isEditMode && (
+            <button
+              onClick={() => { setShowMobileMenu(false); handleNewNote(); }}
+              className="w-full flex items-center gap-3 p-2.5 font-mono text-xs hover:bg-accent transition-colors"
+            >
+              <FilePlus className="h-3.5 w-3.5 text-muted-foreground" />
+              new note
+            </button>
+          )}
+          <button
+            onClick={() => { setShowMobileMenu(false); setShowCommandPalette(true); }}
+            className="w-full flex items-center gap-3 p-2.5 font-mono text-xs hover:bg-accent transition-colors"
+          >
+            <Command className="h-3.5 w-3.5 text-muted-foreground" />
+            command palette
+          </button>
+          <button
+            onClick={() => { setShowMobileMenu(false); setShowMathDialog(true); }}
+            className="w-full flex items-center gap-3 p-2.5 font-mono text-xs hover:bg-accent transition-colors"
+          >
+            <Sigma className="h-3.5 w-3.5 text-muted-foreground" />
+            math formula
+          </button>
+          {isEditMode && (
+            <button
+              onClick={() => { setShowMobileMenu(false); setShowVersionHistory(true); }}
+              className="w-full flex items-center gap-3 p-2.5 font-mono text-xs hover:bg-accent transition-colors"
+            >
+              <History className="h-3.5 w-3.5 text-muted-foreground" />
+              version history
+            </button>
+          )}
+          {!isEditMode && (
+            <>
+              <button
+                onClick={() => { setShowMobileMenu(false); fileInputRef.current?.click(); }}
+                className="w-full flex items-center gap-3 p-2.5 font-mono text-xs hover:bg-accent transition-colors"
+              >
+                <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                import markdown
+              </button>
+              <button
+                onClick={() => { setShowMobileMenu(false); doSaveDraft(); }}
+                className="w-full flex items-center gap-3 p-2.5 font-mono text-xs hover:bg-accent transition-colors"
+              >
+                <Save className="h-3.5 w-3.5 text-muted-foreground" />
+                save draft
+              </button>
+            </>
+          )}
+          <div className="h-px bg-border my-1" />
+          <button
+            onClick={() => { setShowMobileMenu(false); handleExportPdf(); }}
+            className="w-full flex items-center gap-3 p-2.5 font-mono text-xs hover:bg-accent transition-colors"
+          >
+            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+            export to pdf
+          </button>
+          <button
+            onClick={() => { setShowMobileMenu(false); setShowSettings(true); }}
+            className="w-full flex items-center gap-3 p-2.5 font-mono text-xs hover:bg-accent transition-colors"
+          >
+            <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+            settings
+          </button>
+          <div className="h-px bg-border my-1" />
+          <div className="flex items-center gap-3 p-2.5 font-mono text-xs text-muted-foreground">
+            <ThemeToggle />
+            <span>toggle theme</span>
+          </div>
+        </div>
+      </MobileDrawer>
+
       {/* status bar */}
-      <div className="flex items-center gap-4 border-t border-border px-3 py-1.5 font-mono text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 sm:gap-4 border-t border-border px-2 sm:px-3 py-1.5 font-mono text-xs text-muted-foreground">
         <span>{content.length} chars</span>
-        <span>{content.split(/\s+/).filter(Boolean).length} words</span>
-        <span>{content.split("\n").length} lines</span>
+        <span className="hidden sm:inline">{content.split(/\s+/).filter(Boolean).length} words</span>
+        <span className="hidden sm:inline">{content.split("\n").length} lines</span>
         <span className="flex-1" />
         {isEditMode && currentVersion && <span>v{currentVersion}</span>}
-        <span>ctrl+k command palette</span>
-        <span>{isEditMode ? `editing · ${editSlug}` : justPublished ? `published · ${justPublished.slug}` : "draft · auto-saved"}</span>
+        <span className="hidden sm:inline">ctrl+k command palette</span>
+        <span className="truncate">{isEditMode ? `editing · ${editSlug}` : justPublished ? `published · ${justPublished.slug}` : "draft · auto-saved"}</span>
       </div>
 
       {/* context menu */}

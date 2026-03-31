@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { Title } from "@/components/title";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Minus, Plus } from "lucide-react";
+import { ArrowLeft, Download, Minus, Plus, SlidersHorizontal } from "lucide-react";
+import { MobileDrawer } from "@/components/ui/mobile-drawer";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -86,6 +87,7 @@ export function ExportPageContent() {
   const [lineHeight, setLineHeight] = useState(1.6);
 
   const [exporting, setExporting] = useState(false);
+  const [showMobileConfig, setShowMobileConfig] = useState(false);
 
   useEffect(() => {
     registerFonts();
@@ -175,33 +177,44 @@ export function ExportPageContent() {
   return (
     <div className="h-dvh flex flex-col">
       {/* header */}
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+      <div className="flex items-center gap-1 sm:gap-2 border-b border-border px-2 sm:px-3 py-2">
         <Link
           href={isDraft ? "/draft" : "/"}
           className="p-1 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
         </Link>
-        <Title />
-        <span className="font-mono text-xs text-muted-foreground ml-2">
+        <span className="hidden sm:inline-flex"><Title /></span>
+        <span className="font-mono text-xs text-muted-foreground ml-1 sm:ml-2 hidden sm:inline">
           / export to pdf
         </span>
+        <span className="font-mono text-xs text-muted-foreground sm:hidden">
+          export
+        </span>
         <div className="flex-1" />
+        {/* mobile config button */}
+        <button
+          onClick={() => setShowMobileConfig(true)}
+          className="md:hidden p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+        </button>
         <ThemeToggle />
         <button
           onClick={handleExport}
           disabled={exporting || !content}
-          className="ml-2 border border-border bg-foreground text-background px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          className="ml-1 sm:ml-2 border border-border bg-foreground text-background px-2 sm:px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-1.5"
         >
           <Download className="h-3 w-3" />
-          {exporting ? "exporting..." : "export pdf"}
+          <span className="hidden sm:inline">{exporting ? "exporting..." : "export pdf"}</span>
+          <span className="sm:hidden">{exporting ? "..." : "export"}</span>
         </button>
       </div>
 
-      {/* main: config sidebar + live pdf preview */}
+      {/* main: config sidebar (desktop) + live pdf preview */}
       <div className="flex-1 flex overflow-hidden">
-        {/* config panel */}
-        <div className="w-64 border-r border-border overflow-y-auto p-4 space-y-4 shrink-0">
+        {/* desktop config panel */}
+        <div className="hidden md:block w-64 border-r border-border overflow-y-auto p-4 space-y-4 shrink-0">
           <h3 className="font-mono text-xs font-semibold uppercase tracking-wider">
             page settings
           </h3>
@@ -395,6 +408,149 @@ export function ExportPageContent() {
           )}
         </div>
       </div>
+
+      {/* mobile config drawer */}
+      <MobileDrawer
+        open={showMobileConfig}
+        onClose={() => setShowMobileConfig(false)}
+        title="pdf settings"
+      >
+        <div className="p-4 space-y-4">
+          <h3 className="font-mono text-xs font-semibold uppercase tracking-wider">
+            page settings
+          </h3>
+
+          <div className="space-y-1.5">
+            <label className="font-mono text-xs text-muted-foreground">
+              page size
+            </label>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(e.target.value as PageSize)}
+              className="w-full bg-transparent border border-border p-2 font-mono text-xs focus:border-foreground/30 focus:outline-none"
+            >
+              {Object.entries(PAGE_SIZE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="font-mono text-xs text-muted-foreground">
+              orientation
+            </label>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setOrientation("portrait")}
+                className={`flex-1 border p-2 font-mono text-xs transition-colors ${
+                  orientation === "portrait"
+                    ? "border-foreground text-foreground"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                portrait
+              </button>
+              <button
+                onClick={() => setOrientation("landscape")}
+                className={`flex-1 border p-2 font-mono text-xs transition-colors ${
+                  orientation === "landscape"
+                    ? "border-foreground text-foreground"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                landscape
+              </button>
+            </div>
+          </div>
+
+          <div className="w-full h-px bg-border" />
+
+          <h3 className="font-mono text-xs font-semibold uppercase tracking-wider">
+            typography
+          </h3>
+
+          <div className="space-y-1.5">
+            <label className="font-mono text-xs text-muted-foreground">
+              font
+            </label>
+            <select
+              value={fontFamily}
+              onChange={(e) => setFontFamily(e.target.value as PdfFontFamily)}
+              className="w-full bg-transparent border border-border p-2 font-mono text-xs focus:border-foreground/30 focus:outline-none"
+            >
+              {PDF_FONT_OPTIONS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label} ({f.category})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="font-mono text-xs text-muted-foreground">
+              font size: {fontSize}pt
+            </label>
+            <input
+              type="range"
+              min={6}
+              max={20}
+              value={fontSize}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="font-mono text-xs text-muted-foreground">
+              line height: {lineHeight.toFixed(1)}
+            </label>
+            <input
+              type="range"
+              min={1}
+              max={2.5}
+              step={0.1}
+              value={lineHeight}
+              onChange={(e) => setLineHeight(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="font-mono text-xs text-muted-foreground">
+              margin: {marginMm}mm
+            </label>
+            <input
+              type="range"
+              min={5}
+              max={40}
+              value={marginMm}
+              onChange={(e) => setMarginMm(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div className="w-full h-px bg-border" />
+
+          <h3 className="font-mono text-xs font-semibold uppercase tracking-wider">
+            options
+          </h3>
+
+          <Checkbox checked={showTitle} onChange={() => setShowTitle(!showTitle)}>
+            show document title
+          </Checkbox>
+          <Checkbox checked={darkMode} onChange={() => setDarkMode(!darkMode)}>
+            dark background
+          </Checkbox>
+          <Checkbox checked={showPageNumbers} onChange={() => setShowPageNumbers(!showPageNumbers)}>
+            page numbers
+          </Checkbox>
+          <Checkbox checked={keepSectionsTogether} onChange={() => setKeepSectionsTogether(!keepSectionsTogether)}>
+            keep sections together
+          </Checkbox>
+        </div>
+      </MobileDrawer>
     </div>
   );
 }
