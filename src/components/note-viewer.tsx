@@ -376,27 +376,30 @@ export function NoteViewer({ note }: { note: NoteData }) {
         {displayContent !== null && (
           <>
             {/* actions */}
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={copyContent}
-                className="flex-1 border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-2"
+                className="border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-1.5"
               >
-                <Copy className="h-3 w-3 text-muted-foreground" />
-                copy markdown
+                <Copy className="h-3 w-3 text-muted-foreground shrink-0" />
+                <span className="hidden sm:inline">copy markdown</span>
+                <span className="sm:hidden">copy</span>
               </button>
               <button
                 onClick={downloadMd}
-                className="flex-1 border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-2"
+                className="border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-1.5"
               >
-                <Download className="h-3 w-3 text-muted-foreground" />
-                download .md
+                <Download className="h-3 w-3 text-muted-foreground shrink-0" />
+                <span className="hidden sm:inline">download .md</span>
+                <span className="sm:hidden">.md</span>
               </button>
               <button
                 onClick={handleExportPdf}
-                className="flex-1 border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-2"
+                className="border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-1.5"
               >
-                <FileDown className="h-3 w-3 text-muted-foreground" />
-                export pdf
+                <FileDown className="h-3 w-3 text-muted-foreground shrink-0" />
+                <span className="hidden sm:inline">export pdf</span>
+                <span className="sm:hidden">pdf</span>
               </button>
             </div>
 
