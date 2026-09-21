@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Upload, Pencil } from "lucide-react";
+import { ArrowRight, FileText, Upload, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -91,32 +91,40 @@ export function HomeActions() {
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        <button
-          onClick={handleNewNote}
-          className="flex-1 border border-border p-3 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center gap-2"
-        >
-          <FileText className="h-3 w-3 text-muted-foreground" />
-          new note
-        </button>
+    <div className="space-y-3">
+      <button
+        onClick={handleNewNote}
+        className="primary-action w-full group"
+      >
+        <span className="flex items-center gap-3">
+          <span className="action-icon"><FileText className="h-4 w-4" /></span>
+          <span className="text-left">
+            <span className="block text-sm font-semibold">New note</span>
+            <span className="block text-xs font-normal text-primary-foreground/65 mt-0.5">Open a clean, auto-saved draft</span>
+          </span>
+        </span>
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+      </button>
+
+      <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="flex-1 border border-border p-3 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center gap-2"
+          className="secondary-action"
         >
-          <Upload className="h-3 w-3 text-muted-foreground" />
-          import .md
+          <Upload className="h-4 w-4 text-muted-foreground" />
+          Import Markdown
         </button>
         <button
           onClick={() => setShowEditForm(!showEditForm)}
-          className={`flex-1 border p-3 font-mono text-xs font-medium transition-colors flex items-center gap-2 ${
+          className={`secondary-action ${
             showEditForm
-              ? "border-foreground/30 text-foreground"
-              : "border-border hover:border-foreground/20"
+              ? "bg-accent text-foreground"
+              : ""
           }`}
+          aria-expanded={showEditForm}
         >
-          <Pencil className="h-3 w-3 text-muted-foreground" />
-          edit existing
+          <Pencil className="h-4 w-4 text-muted-foreground" />
+          Edit published
         </button>
         <input
           ref={fileInputRef}
@@ -128,28 +136,32 @@ export function HomeActions() {
       </div>
 
       {showEditForm && (
-        <div className="border border-border p-3 space-y-2">
+        <div className="surface p-4 space-y-3">
+          <p className="text-sm font-medium">Open a published note</p>
+          <p className="text-xs leading-5 text-muted-foreground">Use the slug and private edit key you received when publishing.</p>
           <input
             type="text"
             value={editSlug}
             onChange={(e) => setEditSlug(e.target.value)}
-            placeholder="slug"
-            className="w-full bg-transparent border border-border p-2 font-mono text-xs focus:border-foreground/30 focus:outline-none transition-colors"
+            placeholder="Note slug"
+            aria-label="Note slug"
+            className="field"
           />
           <input
             type="text"
             value={editKey}
             onChange={(e) => setEditKey(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleEditVerify()}
-            placeholder="edit key"
-            className="w-full bg-transparent border border-border p-2 font-mono text-xs focus:border-foreground/30 focus:outline-none transition-colors"
+            placeholder="Private edit key"
+            aria-label="Private edit key"
+            className="field font-mono"
           />
           <button
             onClick={handleEditVerify}
             disabled={verifying || !editSlug || !editKey}
-            className="w-full border border-border bg-foreground text-background p-2 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50"
+            className="button-primary w-full"
           >
-            {verifying ? "verifying..." : "open in editor"}
+            {verifying ? "Verifying…" : "Open in editor"}
           </button>
         </div>
       )}

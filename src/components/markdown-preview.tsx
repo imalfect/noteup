@@ -7,9 +7,14 @@ import rehypeKatex from "rehype-katex";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 
-export function MarkdownPreview({ content }: { content: string }) {
+type MarkdownPreviewProps = {
+  content: string;
+  className?: string;
+};
+
+export function MarkdownPreview({ content, className = "" }: MarkdownPreviewProps) {
   return (
-    <div className="markdown-preview">
+    <div className={`markdown-preview ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeRaw, rehypeKatex, rehypeHighlight]}

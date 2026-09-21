@@ -17,6 +17,8 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  Type,
+  ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -65,6 +67,9 @@ export function NoteViewer({ note }: { note: NoteData }) {
   const [versionNeedsDecrypt, setVersionNeedsDecrypt] = useState(false);
   const [versionSalt, setVersionSalt] = useState<string | null>(null);
   const [versionIv, setVersionIv] = useState<string | null>(null);
+  const [readerSize, setReaderSize] = useState<"compact" | "comfortable" | "large">(
+    "comfortable"
+  );
 
   // cache password across version switches within the session
   const cachedPasswordRef = useRef<string>("");
@@ -235,184 +240,159 @@ export function NoteViewer({ note }: { note: NoteData }) {
   const displayTitle = versionTitle || note.title;
 
   return (
-    <div className="min-h-dvh py-12">
-      <div className="max-w-xl mx-auto px-6 sm:px-8 space-y-6">
-        {/* header */}
-        <div className="flex items-center justify-between">
-          <Link href="/">
-            <Title />
+    <main id="main-content" className="min-h-dvh pb-20">
+      <header className="reader-header sticky top-0 z-20">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:px-6">
+          <Link href="/" className="icon-button" aria-label="Back to noteup">
+            <ArrowLeft className="h-4 w-4" />
           </Link>
+          <Link href="/" className="hidden sm:block"><Title /></Link>
+          <div className="h-5 w-px bg-border" />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{displayTitle}</span>
+
+          {displayContent !== null ? (
+            <div className="hidden items-center gap-1 sm:flex">
+              <button onClick={copyContent} className="toolbar-button" aria-label="Copy Markdown" title="Copy Markdown">
+                <Copy className="h-4 w-4" />
+              </button>
+              <button onClick={downloadMd} className="toolbar-button" aria-label="Download Markdown" title="Download Markdown">
+                <Download className="h-4 w-4" />
+              </button>
+              <button onClick={handleExportPdf} className="toolbar-button" aria-label="Export PDF" title="Export PDF">
+                <FileDown className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
           <ThemeToggle />
         </div>
+      </header>
 
-        {/* note metadata */}
-        <div className="border border-border divide-y divide-border">
-          <div className="p-3 flex justify-between font-mono text-xs">
-            <span className="text-muted-foreground flex items-center gap-1.5">
-              <Hash className="h-3 w-3" />
-              slug
-            </span>
-            <span>{note.slug}</span>
-          </div>
-          <div className="p-3 flex justify-between font-mono text-xs">
-            <span className="text-muted-foreground flex items-center gap-1.5">
-              <Clock className="h-3 w-3" />
-              created
-            </span>
-            <span>
-              {createdDate.toLocaleDateString()}{" "}
-              {createdDate.toLocaleTimeString()}
-            </span>
-          </div>
-          <div className="p-3 flex justify-between font-mono text-xs">
-            <span className="text-muted-foreground flex items-center gap-1.5">
-              <Shield className="h-3 w-3" />
-              encrypted
-            </span>
-            <span>
-              {isCurrentVersionEncrypted ? "yes — aes-256-gcm" : "no"}
-            </span>
-          </div>
-          <div className="p-3 flex justify-between font-mono text-xs">
-            <span className="text-muted-foreground flex items-center gap-1.5">
-              <History className="h-3 w-3" />
-              version
-            </span>
-            <span>
-              {viewingVersion ? `v${viewingVersion}` : `v${note.version}`}
-              {viewingVersion && (
-                <span className="text-muted-foreground ml-1">(viewing old)</span>
-              )}
-            </span>
-          </div>
-        </div>
-
-        {/* version history toggle */}
-        <button
-          onClick={toggleVersions}
-          className="w-full border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-2"
-        >
-          <History className="h-3 w-3 text-muted-foreground" />
-          version history
-          {showVersions ? (
-            <ChevronUp className="h-3 w-3 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-          )}
-        </button>
-
-        {showVersions && (
-          <div className="border border-border divide-y divide-border">
-            {loadingVersions ? (
-              <div className="p-3 font-mono text-xs text-muted-foreground animate-pulse">
-                loading...
+      <div className="mx-auto max-w-7xl px-5 pt-10 sm:px-8 sm:pt-16">
+        <div className="mx-auto max-w-[76ch]">
+          <div className="mb-10 border-b border-border pb-8 sm:mb-12 sm:pb-10">
+            {viewingVersion ? (
+              <div className="mb-4 inline-flex rounded-md bg-muted px-2.5 py-1 font-mono text-xs text-muted-foreground">
+                Viewing version {viewingVersion}. Select the latest version below to return.
               </div>
-            ) : versions.length === 0 ? (
-              <div className="p-3 font-mono text-xs text-muted-foreground">
-                no version history
+            ) : null}
+            <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-5xl">
+              {displayTitle}
+            </h1>
+            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+              <span>{createdDate.toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
+              <span aria-hidden="true">·</span>
+              <span>Version {viewingVersion || note.version}</span>
+              {isCurrentVersionEncrypted ? (
+                <span className="inline-flex items-center gap-1.5"><Lock className="h-3.5 w-3.5" />Encrypted</span>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+            <div className="reader-controls" aria-label="Reading size">
+              <Type className="mx-1 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              {(["compact", "comfortable", "large"] as const).map((size, index) => (
+                <button
+                  key={size}
+                  onClick={() => setReaderSize(size)}
+                  className="reader-size-button"
+                  aria-label={`${size} text size`}
+                  aria-pressed={readerSize === size}
+                  title={`${size} text size`}
+                >
+                  <span style={{ fontSize: `${12 + index * 2}px` }}>A</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 sm:hidden">
+              <button onClick={copyContent} className="button-secondary px-3" disabled={displayContent === null}>
+                <Copy className="h-4 w-4" /> Copy
+              </button>
+              <button onClick={downloadMd} className="button-secondary px-3" disabled={displayContent === null}>
+                <Download className="h-4 w-4" /> .md
+              </button>
+            </div>
+          </div>
+
+          {needsDecrypt ? (
+            <section className="surface p-5 sm:p-6" aria-labelledby="decrypt-heading">
+              <div className="mb-4 flex items-start gap-3">
+                <span className="action-icon"><Lock className="h-4 w-4" /></span>
+                <div>
+                  <h2 id="decrypt-heading" className="font-semibold">Password required</h2>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {viewingVersion ? `Version ${viewingVersion} is encrypted.` : "This note is encrypted."} Decryption happens in your browser.
+                  </p>
+                </div>
               </div>
-            ) : (
-              versions.map((v) => {
-                const vDate = new Date(v.createdAt);
-                const isCurrent = v.version === note.version && !viewingVersion;
-                const isViewing = v.version === viewingVersion;
-                return (
-                  <button
-                    key={v.id}
-                    onClick={() => loadVersion(v.version)}
-                    className={`w-full p-3 flex justify-between font-mono text-xs text-left hover:bg-accent transition-colors ${
-                      isCurrent || isViewing ? "bg-muted/50" : ""
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">v{v.version}</span>
-                      {v.version === note.version && (
-                        <span className="text-muted-foreground">(latest)</span>
-                      )}
-                      {isViewing && (
-                        <span className="text-muted-foreground">(viewing)</span>
-                      )}
-                    </div>
-                    <span className="text-muted-foreground">
-                      {vDate.toLocaleDateString()} {vDate.toLocaleTimeString()}
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        )}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleDecrypt()}
+                  placeholder="Enter password"
+                  aria-label="Note password"
+                  className="field flex-1"
+                />
+                <button onClick={handleDecrypt} disabled={decrypting || !password} className="button-primary sm:px-5">
+                  {decrypting ? "Decrypting…" : "Open note"}
+                </button>
+              </div>
+            </section>
+          ) : null}
 
-        {/* decrypt form */}
-        {needsDecrypt && (
-          <div className="border border-border p-4 space-y-3">
-            <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-              <Lock className="h-3.5 w-3.5" />
-              {viewingVersion
-                ? `version ${viewingVersion} is encrypted`
-                : "this note is encrypted"}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleDecrypt()}
-                placeholder="enter password"
-                className="flex-1 bg-transparent border border-border p-2 font-mono text-xs focus:border-foreground/30 focus:outline-none transition-colors"
-              />
-              <button
-                onClick={handleDecrypt}
-                disabled={decrypting || !password}
-                className="border border-border bg-foreground text-background px-4 py-2 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50"
-              >
-                {decrypting ? "..." : "decrypt"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* content */}
-        {displayContent !== null && (
-          <>
-            {/* actions */}
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={copyContent}
-                className="border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-1.5"
-              >
-                <Copy className="h-3 w-3 text-muted-foreground shrink-0" />
-                <span className="hidden sm:inline">copy markdown</span>
-                <span className="sm:hidden">copy</span>
-              </button>
-              <button
-                onClick={downloadMd}
-                className="border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-1.5"
-              >
-                <Download className="h-3 w-3 text-muted-foreground shrink-0" />
-                <span className="hidden sm:inline">download .md</span>
-                <span className="sm:hidden">.md</span>
-              </button>
-              <button
-                onClick={handleExportPdf}
-                className="border border-border p-2.5 font-mono text-xs font-medium hover:border-foreground/20 transition-colors flex items-center justify-center gap-1.5"
-              >
-                <FileDown className="h-3 w-3 text-muted-foreground shrink-0" />
-                <span className="hidden sm:inline">export pdf</span>
-                <span className="sm:hidden">pdf</span>
-              </button>
-            </div>
-
-            {/* rendered content */}
-            <div className="border border-border p-4">
-              <h2 className="font-mono text-sm font-semibold mb-4">
-                {displayTitle}
-              </h2>
+          {displayContent !== null ? (
+            <article className={`reader-document reader-${readerSize}`}>
               <MarkdownPreview content={displayContent} />
+            </article>
+          ) : null}
+
+          <section className="mt-16 border-t border-border pt-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <details className="note-details">
+                <summary>About this note</summary>
+                <dl className="mt-4 grid gap-3 rounded-lg bg-muted/60 p-4 text-sm sm:grid-cols-2">
+                  <div><dt><Hash className="h-3.5 w-3.5" />Slug</dt><dd>{note.slug}</dd></div>
+                  <div><dt><Clock className="h-3.5 w-3.5" />Published</dt><dd>{createdDate.toLocaleString()}</dd></div>
+                  <div><dt><Shield className="h-3.5 w-3.5" />Privacy</dt><dd>{isCurrentVersionEncrypted ? "AES-256-GCM encrypted" : "Public"}</dd></div>
+                  <div><dt><History className="h-3.5 w-3.5" />Version</dt><dd>{viewingVersion || note.version}</dd></div>
+                </dl>
+              </details>
+
+              <button onClick={toggleVersions} className="button-secondary" aria-expanded={showVersions}>
+                <History className="h-4 w-4" /> Version history
+                {showVersions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
             </div>
-          </>
-        )}
+
+            {showVersions ? (
+              <div className="surface mt-4 divide-y divide-border overflow-hidden">
+                {loadingVersions ? (
+                  <div className="p-4 text-sm text-muted-foreground animate-pulse">Loading versions…</div>
+                ) : versions.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground">No earlier versions yet.</div>
+                ) : versions.map((v) => {
+                  const vDate = new Date(v.createdAt);
+                  const isCurrent = v.version === note.version && !viewingVersion;
+                  const isViewing = v.version === viewingVersion;
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => loadVersion(v.version)}
+                      className={`version-row ${isCurrent || isViewing ? "bg-muted/70" : ""}`}
+                    >
+                      <span className="font-medium">Version {v.version}{v.version === note.version ? " · latest" : ""}</span>
+                      <span className="text-muted-foreground">{vDate.toLocaleString()}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </section>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

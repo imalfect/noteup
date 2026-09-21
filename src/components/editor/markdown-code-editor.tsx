@@ -139,10 +139,10 @@ export const MarkdownCodeEditor = forwardRef<MarkdownCodeEditorHandle, MarkdownC
         defaultValue={content}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        className="flex-1 w-full h-full resize-none bg-transparent p-4 text-[13px] leading-relaxed focus:outline-none text-foreground"
+        className="editor-textarea flex-1 w-full h-full resize-none bg-transparent p-5 sm:p-8 text-[15px] leading-[1.75] focus:outline-none text-foreground"
         style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}
         spellCheck={false}
-        placeholder="write markdown here..."
+        placeholder="Start writing…"
       />
     );
   }

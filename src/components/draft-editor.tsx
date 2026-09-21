@@ -362,7 +362,7 @@ export function DraftEditor() {
 
   return (
     <div
-      className="flex flex-col origin-top-left"
+      className="flex flex-col overflow-hidden origin-top-left"
       style={{
         transform: `scale(${uiScale})`,
         width: `${100 / uiScale}%`,
@@ -370,15 +370,16 @@ export function DraftEditor() {
       }}
     >
       {/* header */}
-      <div className="flex items-center gap-1 sm:gap-2 border-b border-border px-2 sm:px-3 py-2">
+      <header className="flex min-h-14 items-center gap-2 border-b border-border px-3 sm:px-4">
         <Link
           href="/"
-          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+          className="icon-button"
+          aria-label="Back to noteup"
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
+          <ArrowLeft className="h-4 w-4" />
         </Link>
 
-        <span className="hidden sm:inline-flex"><Title /></span>
+        <div className="hidden sm:block"><Title /></div>
 
         {isEditMode && (
           <span className="font-mono text-xs text-muted-foreground ml-1 hidden md:inline">
@@ -390,14 +391,15 @@ export function DraftEditor() {
           </span>
         )}
 
-        <div className="w-px h-4 bg-border mx-0.5 sm:mx-1 hidden sm:block" />
+        <div className="hidden h-5 w-px bg-border sm:block" />
 
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="bg-transparent font-mono text-xs focus:outline-none flex-1 min-w-0"
-          placeholder="untitled"
+          className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-2 text-sm font-medium focus:outline-none focus:bg-muted/60"
+          placeholder="Untitled note"
+          aria-label="Note title"
         />
 
         {/* desktop actions */}
@@ -406,9 +408,10 @@ export function DraftEditor() {
             <Tooltip content="new note">
               <button
                 onClick={handleNewNote}
-                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                className="toolbar-button desktop-sm-action"
+                aria-label="New note"
               >
-                <FilePlus className="h-3.5 w-3.5" />
+                <FilePlus className="h-4 w-4" />
               </button>
             </Tooltip>
           )}
@@ -416,18 +419,20 @@ export function DraftEditor() {
           <Tooltip content="command palette (ctrl+k)">
             <button
               onClick={() => setShowCommandPalette(true)}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              className="toolbar-button desktop-lg-action"
+              aria-label="Command palette"
             >
-              <Command className="h-3.5 w-3.5" />
+              <Command className="h-4 w-4" />
             </button>
           </Tooltip>
 
           <Tooltip content="math formula">
             <button
               onClick={() => setShowMathDialog(true)}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              className="toolbar-button desktop-lg-action"
+              aria-label="Insert math formula"
             >
-              <Sigma className="h-3.5 w-3.5" />
+              <Sigma className="h-4 w-4" />
             </button>
           </Tooltip>
 
@@ -435,9 +440,10 @@ export function DraftEditor() {
             <Tooltip content="version history">
               <button
                 onClick={() => setShowVersionHistory(true)}
-                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                className="toolbar-button desktop-md-action"
+                aria-label="Version history"
               >
-                <History className="h-3.5 w-3.5" />
+                <History className="h-4 w-4" />
               </button>
             </Tooltip>
           )}
@@ -447,18 +453,20 @@ export function DraftEditor() {
               <Tooltip content="import markdown">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                  className="toolbar-button desktop-lg-action"
+                  aria-label="Import Markdown"
                 >
-                  <Upload className="h-3.5 w-3.5" />
+                  <Upload className="h-4 w-4" />
                 </button>
               </Tooltip>
 
               <Tooltip content="save draft (ctrl+s)">
                 <button
                   onClick={doSaveDraft}
-                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                  className="toolbar-button desktop-lg-action"
+                  aria-label="Save draft"
                 >
-                  <Save className="h-3.5 w-3.5" />
+                  <Save className="h-4 w-4" />
                 </button>
               </Tooltip>
             </>
@@ -467,12 +475,14 @@ export function DraftEditor() {
           <Tooltip content={showPreview ? "hide preview" : "show preview"}>
             <button
               onClick={() => setShowPreview(!showPreview)}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              className={`toolbar-button ${showPreview ? "bg-accent text-foreground" : ""}`}
+              aria-label={showPreview ? "Hide preview" : "Show preview"}
+              aria-pressed={showPreview}
             >
               {showPreview ? (
-                <EyeOff className="h-3.5 w-3.5" />
+                <EyeOff className="h-4 w-4" />
               ) : (
-                <Eye className="h-3.5 w-3.5" />
+                <Eye className="h-4 w-4" />
               )}
             </button>
           </Tooltip>
@@ -480,9 +490,10 @@ export function DraftEditor() {
           <Tooltip content="settings">
             <button
               onClick={() => setShowSettings(true)}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              className="toolbar-button desktop-sm-action"
+              aria-label="Settings"
             >
-              <Settings className="h-3.5 w-3.5" />
+              <Settings className="h-4 w-4" />
             </button>
           </Tooltip>
 
@@ -493,19 +504,22 @@ export function DraftEditor() {
         <div className="flex md:hidden items-center gap-0.5">
           <button
             onClick={() => setShowMobilePreview(!showMobilePreview)}
-            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="toolbar-button"
+            aria-label={showMobilePreview ? "Hide preview" : "Show preview"}
+            aria-pressed={showMobilePreview}
           >
             {showMobilePreview ? (
-              <EyeOff className="h-3.5 w-3.5" />
+              <EyeOff className="h-4 w-4" />
             ) : (
-              <Eye className="h-3.5 w-3.5" />
+              <Eye className="h-4 w-4" />
             )}
           </button>
           <button
             onClick={() => setShowMobileMenu(true)}
-            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="toolbar-button"
+            aria-label="Open actions menu"
           >
-            <Menu className="h-3.5 w-3.5" />
+            <Menu className="h-4 w-4" />
           </button>
         </div>
 
@@ -523,7 +537,7 @@ export function DraftEditor() {
               onClick={() => {
                 router.push(`/draft?edit=${justPublished.slug}&key=${justPublished.editKey}`);
               }}
-              className="ml-1 sm:ml-2 border border-border bg-foreground text-background px-2 sm:px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors whitespace-nowrap"
+              className="button-primary ml-1 whitespace-nowrap px-3 py-2 text-xs"
             >
               <span className="hidden sm:inline">edit published</span>
               <span className="sm:hidden">edit</span>
@@ -532,7 +546,7 @@ export function DraftEditor() {
         ) : (
           <button
             onClick={() => setShowPublish(true)}
-            className="ml-1 sm:ml-2 border border-border bg-foreground text-background px-2 sm:px-3 py-1.5 font-mono text-xs font-medium hover:bg-foreground/90 transition-colors whitespace-nowrap"
+            className="button-primary ml-1 whitespace-nowrap px-3 py-2 text-xs"
           >
             {isEditMode ? (
               <><span className="hidden sm:inline">save changes</span><span className="sm:hidden">save</span></>
@@ -541,7 +555,7 @@ export function DraftEditor() {
             )}
           </button>
         )}
-      </div>
+      </header>
 
       {/* toolbar */}
       <Toolbar
@@ -552,7 +566,7 @@ export function DraftEditor() {
       {/* editor + optional desktop markdown preview */}
       <div className="flex-1 flex overflow-hidden">
         <div
-          className={`${showPreview ? "hidden md:flex md:w-1/2 md:border-r md:border-border" : "w-full"} flex flex-col overflow-hidden`}
+          className={`${showPreview ? "hidden md:flex md:w-1/2 md:border-r md:border-border" : "flex w-full"} flex-col overflow-hidden`}
         >
           <MarkdownCodeEditor
             ref={codeEditorRef}
@@ -561,26 +575,14 @@ export function DraftEditor() {
           />
         </div>
         {showPreview && (
-          <>
-            {/* desktop: side-by-side */}
-            <div
-              className="hidden md:block w-1/2 overflow-auto p-4"
-              style={{
-                fontFamily: editorFont || "var(--font-mono), 'Fira Code', 'SF Mono', ui-monospace, monospace",
-              }}
-            >
-              <MarkdownPreview content={content} />
-            </div>
-            {/* mobile: replaces editor */}
-            <div
-              className="md:hidden w-full overflow-auto p-4"
-              style={{
-                fontFamily: editorFont || "var(--font-mono), 'Fira Code', 'SF Mono', ui-monospace, monospace",
-              }}
-            >
-              <MarkdownPreview content={content} />
-            </div>
-          </>
+          <div
+            className="w-full overflow-auto px-5 py-8 sm:px-8 md:w-1/2 lg:px-12"
+            style={{
+              fontFamily: editorFont || "var(--font-sans), system-ui, sans-serif",
+            }}
+          >
+            <MarkdownPreview content={content} />
+          </div>
         )}
       </div>
 
@@ -591,9 +593,9 @@ export function DraftEditor() {
         title="preview"
       >
         <div
-          className="p-4"
+          className="p-5 sm:p-8"
           style={{
-            fontFamily: editorFont || "var(--font-mono), 'Fira Code', 'SF Mono', ui-monospace, monospace",
+            fontFamily: editorFont || "var(--font-sans), system-ui, sans-serif",
           }}
         >
           <MarkdownPreview content={content} />
@@ -681,13 +683,13 @@ export function DraftEditor() {
       </MobileDrawer>
 
       {/* status bar */}
-      <div className="flex items-center gap-2 sm:gap-4 border-t border-border px-2 sm:px-3 py-1.5 font-mono text-xs text-muted-foreground">
+      <div className="flex min-h-8 items-center gap-4 border-t border-border px-3 font-mono text-[11px] text-muted-foreground">
         <span>{content.length} chars</span>
         <span className="hidden sm:inline">{content.split(/\s+/).filter(Boolean).length} words</span>
         <span className="hidden sm:inline">{content.split("\n").length} lines</span>
         <span className="flex-1" />
         {isEditMode && currentVersion && <span>v{currentVersion}</span>}
-        <span className="hidden sm:inline">ctrl+k command palette</span>
+        <span className="hidden md:inline">ctrl+k command palette</span>
         <span className="truncate">{isEditMode ? `editing · ${editSlug}` : justPublished ? `published · ${justPublished.slug}` : "draft · auto-saved"}</span>
       </div>
 

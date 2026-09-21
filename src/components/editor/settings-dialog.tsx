@@ -57,7 +57,7 @@ const FONT_CATEGORIES: { label: string; fonts: FontOption[] }[] = [
   },
 ];
 
-const DEFAULT_FONT = "'JetBrains Mono', monospace";
+const DEFAULT_FONT = "var(--font-sans), system-ui, sans-serif";
 
 export function SettingsDialog({
   open,

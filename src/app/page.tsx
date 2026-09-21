@@ -5,35 +5,40 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="h-dvh flex flex-col items-center justify-center px-6 sm:px-8">
-      <div className="w-full max-w-md space-y-6">
+    <main id="main-content" className="min-h-dvh flex flex-col items-center justify-center px-5 py-12 sm:px-8">
+      <div className="w-full max-w-lg space-y-8">
         <div className="flex items-center justify-between">
           <Title />
           <ThemeToggle />
         </div>
 
-        <p className="font-mono text-xs text-muted-foreground">
-          markdown notes, shared instantly. write, publish, share.
-        </p>
+        <div className="space-y-3">
+          <h2 className="text-3xl sm:text-4xl font-semibold tracking-[-0.04em] leading-[1.08] text-balance">
+            Write it down. Share it when it’s ready.
+          </h2>
+          <p className="text-[15px] leading-7 text-muted-foreground max-w-[48ch]">
+            A quiet Markdown editor for notes, drafts, and documents. No account required.
+          </p>
+        </div>
 
         <HomeActions />
 
-        <div className="border border-border divide-y divide-border">
+        <div className="surface divide-y divide-border">
           <div className="p-3 flex justify-between font-mono text-xs">
             <span className="text-muted-foreground">encryption</span>
-            <span>client-side aes-256-gcm</span>
+            <span>optional, in your browser</span>
           </div>
           <div className="p-3 flex justify-between font-mono text-xs">
             <span className="text-muted-foreground">editor</span>
-            <span>markdown + gfm + latex</span>
+            <span>Markdown, tables, and math</span>
           </div>
           <div className="p-3 flex justify-between font-mono text-xs">
             <span className="text-muted-foreground">export</span>
-            <span>pdf with page preview</span>
+            <span>Markdown and PDF</span>
           </div>
           <div className="p-3 flex justify-between font-mono text-xs">
-            <span className="text-muted-foreground">storage</span>
-            <span>postgresql via drizzle</span>
+            <span className="text-muted-foreground">drafts</span>
+            <span>saved automatically</span>
           </div>
         </div>
 
@@ -43,6 +48,6 @@ export default function Home() {
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -41,6 +41,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased">
+        <a href="#main-content" className="skip-link">
+          skip to content
+        </a>
         <ThemeProvider>
           {children}
           <Toaster

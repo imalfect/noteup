@@ -15,13 +15,14 @@ export function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors p-1"
-      title="toggle theme"
+      className="icon-button"
+      title={`switch to ${theme === "dark" ? "light" : "dark"} theme`}
+      aria-label={`switch to ${theme === "dark" ? "light" : "dark"} theme`}
     >
       {theme === "dark" ? (
-        <Sun className="h-3.5 w-3.5" />
+        <Sun className="h-4 w-4" />
       ) : (
-        <Moon className="h-3.5 w-3.5" />
+        <Moon className="h-4 w-4" />
       )}
     </button>
   );

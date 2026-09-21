@@ -150,7 +150,7 @@ const tools: ToolItem[] = [
 
 export function Toolbar({ codeEditorRef, onExportPdf }: ToolbarProps) {
   return (
-    <div className="flex items-center gap-0.5 border-b border-border px-2 py-1.5 overflow-x-auto">
+    <div className="editor-toolbar flex items-center gap-0.5 border-b border-border px-3 py-2 overflow-x-auto">
       {tools.map((tool, i) =>
         tool === "sep" ? (
           <div key={i} className="w-px h-4 bg-border mx-1" />
@@ -161,9 +161,10 @@ export function Toolbar({ codeEditorRef, onExportPdf }: ToolbarProps) {
                 const handle = codeEditorRef.current;
                 if (handle) tool.action(handle);
               }}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              className="toolbar-button"
+              aria-label={tool.title}
             >
-              <tool.icon className="h-3.5 w-3.5" />
+              <tool.icon className="h-4 w-4" />
             </button>
           </Tooltip>
         )
@@ -174,9 +175,10 @@ export function Toolbar({ codeEditorRef, onExportPdf }: ToolbarProps) {
       <Tooltip content="export to pdf">
         <button
           onClick={onExportPdf}
-          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+          className="toolbar-button"
+          aria-label="export to PDF"
         >
-          <FileDown className="h-3.5 w-3.5" />
+          <FileDown className="h-4 w-4" />
         </button>
       </Tooltip>
     </div>
